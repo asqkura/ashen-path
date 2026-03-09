@@ -1,27 +1,43 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections.Generic;
 
 namespace AshenPath.Battle
 {
     public class BattleUI : MonoBehaviour
     {
+        private static readonly Vector2 EnemyPanelSize = new(440f, 136f);
+        private static readonly Vector2 PlayerPanelSize = new(440f, 176f);
+        private static readonly Vector2 HpSectionSize = new(384f, 64f);
+        private static readonly Vector2 ArenaSize = new(1360f, 500f);
+        private static readonly Vector2 HandRootSize = new(1520f, 220f);
         private static readonly Color BackgroundColor = new(0.08f, 0.09f, 0.12f, 1f);
         private static readonly Color PanelColor = new(0.14f, 0.16f, 0.2f, 0.92f);
         private static readonly Color EnemyAccent = new(0.76f, 0.32f, 0.32f, 1f);
         private static readonly Color PlayerAccent = new(0.32f, 0.72f, 0.58f, 1f);
+        private static readonly Color SpAccent = new(0.36f, 0.64f, 0.96f, 1f);
         private static readonly Color TextColor = new(0.95f, 0.96f, 0.98f, 1f);
+        private static readonly Color ArenaColor = new(0.12f, 0.13f, 0.16f, 0.92f);
+        private static readonly Color CardColor = new(0.88f, 0.82f, 0.68f, 1f);
+        private static readonly Color CardDisabledColor = new(0.35f, 0.35f, 0.35f, 0.95f);
+        private static readonly Color DarkTextColor = new(0.17f, 0.13f, 0.09f, 1f);
 
         private Font _font;
-        private Button _attackButton;
-        private Text _attackButtonText;
         private Text _turnText;
         private Text _resultText;
         private Text _playerNameText;
         private Text _playerHpText;
         private Image _playerHpFill;
+        private Text _playerSpText;
+        private Image _playerSpFill;
         private Text _enemyNameText;
         private Text _enemyHpText;
         private Image _enemyHpFill;
+        private readonly List<Button> _cardButtons = new();
+        private readonly List<Text> _cardTitleTexts = new();
+        private readonly List<Text> _cardDescriptionTexts = new();
+        private readonly List<Text> _cardCostTexts = new();
+        private readonly List<Image> _cardBackgrounds = new();
 
         public void Build()
         {
@@ -43,38 +59,49 @@ namespace AshenPath.Battle
             var background = CreateImage("Background", canvasObject.transform, BackgroundColor);
             StretchFullScreen(background.rectTransform);
 
-            var enemyPanel = CreatePanel("EnemyPanel", canvasObject.transform, new Vector2(0f, -64f), new Vector2(760f, 220f), new Vector2(0.5f, 1f));
-            _enemyNameText = CreateText("EnemyName", enemyPanel.transform, 34, TextAnchor.MiddleLeft, TextColor);
-            ConfigureRect(_enemyNameText.rectTransform, new Vector2(40f, -36f), new Vector2(680f, 40f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-            _enemyHpFill = CreateHpSection(enemyPanel.transform, new Vector2(40f, -110f), EnemyAccent, out _enemyHpText);
+            CreateArena(canvasObject.transform);
 
-            var playerPanel = CreatePanel("PlayerPanel", canvasObject.transform, new Vector2(0f, 64f), new Vector2(760f, 220f), new Vector2(0.5f, 0f));
+            var enemyPanel = CreatePanel("EnemyPanel", canvasObject.transform, new Vector2(-48f, -44f), EnemyPanelSize, new Vector2(1f, 1f));
+            _enemyNameText = CreateText("EnemyName", enemyPanel.transform, 34, TextAnchor.MiddleLeft, TextColor);
+            ConfigureRect(_enemyNameText.rectTransform, new Vector2(28f, -28f), new Vector2(384f, 36f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            _enemyHpFill = CreateHpSection(enemyPanel.transform, new Vector2(28f, -88f), HpSectionSize, EnemyAccent, out _enemyHpText);
+
+            var playerPanel = CreatePanel("PlayerPanel", canvasObject.transform, new Vector2(48f, 272f), PlayerPanelSize, new Vector2(0f, 0f));
             _playerNameText = CreateText("PlayerName", playerPanel.transform, 34, TextAnchor.MiddleLeft, TextColor);
-            ConfigureRect(_playerNameText.rectTransform, new Vector2(40f, -36f), new Vector2(680f, 40f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-            _playerHpFill = CreateHpSection(playerPanel.transform, new Vector2(40f, -110f), PlayerAccent, out _playerHpText);
+            ConfigureRect(_playerNameText.rectTransform, new Vector2(28f, -28f), new Vector2(384f, 36f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            _playerHpFill = CreateHpSection(playerPanel.transform, new Vector2(28f, -88f), HpSectionSize, PlayerAccent, out _playerHpText);
+            _playerSpFill = CreateResourceSection(playerPanel.transform, "SpSection", new Vector2(28f, -130f), HpSectionSize, SpAccent, "SP", out _playerSpText);
 
             _turnText = CreateText("TurnText", canvasObject.transform, 30, TextAnchor.MiddleCenter, TextColor);
-            ConfigureRect(_turnText.rectTransform, new Vector2(0f, -20f), new Vector2(960f, 60f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            ConfigureRect(_turnText.rectTransform, new Vector2(0f, 224f), new Vector2(1120f, 60f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
             _resultText = CreateText("ResultText", canvasObject.transform, 54, TextAnchor.MiddleCenter, TextColor);
-            ConfigureRect(_resultText.rectTransform, new Vector2(0f, -100f), new Vector2(960f, 80f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            ConfigureRect(_resultText.rectTransform, new Vector2(0f, 80f), new Vector2(960f, 80f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
             _resultText.gameObject.SetActive(false);
 
-            _attackButton = CreateButton(canvasObject.transform, new Vector2(0f, 320f), new Vector2(320f, 90f), new Vector2(0.5f, 0.5f));
-            _attackButtonText = _attackButton.GetComponentInChildren<Text>();
-            _attackButtonText.text = "攻撃";
+            CreateCardHand(canvasObject.transform);
         }
 
         public void Bind(BattleController controller)
         {
-            _attackButton.onClick.RemoveAllListeners();
-            _attackButton.onClick.AddListener(controller.PerformPlayerAttack);
+            for (var i = 0; i < _cardButtons.Count; i++)
+            {
+                var cardIndex = i;
+                _cardButtons[i].onClick.RemoveAllListeners();
+                _cardButtons[i].onClick.AddListener(() => controller.PerformPlayerCard(cardIndex));
+            }
         }
 
         public void RefreshUnits(BattleUnit player, BattleUnit enemy)
         {
             UpdateUnitDisplay(player, _playerNameText, _playerHpText, _playerHpFill);
             UpdateUnitDisplay(enemy, _enemyNameText, _enemyHpText, _enemyHpFill);
+        }
+
+        public void RefreshPlayerSp(int currentSp, int maxSp)
+        {
+            _playerSpText.text = $"SP {currentSp} / {maxSp}";
+            _playerSpFill.fillAmount = maxSp > 0 ? currentSp / (float)maxSp : 0f;
         }
 
         public void SetTurnText(string message)
@@ -88,10 +115,35 @@ namespace AshenPath.Battle
             _resultText.gameObject.SetActive(visible);
         }
 
-        public void SetAttackButtonInteractable(bool interactable)
+        public void RefreshHand(IReadOnlyList<BattleCardData> hand)
         {
-            _attackButton.interactable = interactable;
-            _attackButtonText.color = interactable ? TextColor : new Color(0.6f, 0.64f, 0.68f, 1f);
+            for (var i = 0; i < _cardButtons.Count; i++)
+            {
+                var hasCard = hand != null && i < hand.Count;
+                _cardButtons[i].gameObject.SetActive(hasCard);
+
+                if (!hasCard)
+                {
+                    continue;
+                }
+
+                _cardTitleTexts[i].text = hand[i].cardName;
+                _cardDescriptionTexts[i].text = hand[i].description;
+                _cardCostTexts[i].text = $"{hand[i].spCost} SP";
+            }
+        }
+
+        public void SetCardsInteractable(bool interactable, IReadOnlyList<BattleCardData> hand, int currentSp)
+        {
+            for (var i = 0; i < _cardButtons.Count; i++)
+            {
+                var canAfford = hand != null && i < hand.Count && currentSp >= hand[i].spCost;
+                _cardButtons[i].interactable = interactable && _cardButtons[i].gameObject.activeSelf && canAfford;
+                _cardBackgrounds[i].color = _cardButtons[i].interactable ? CardColor : CardDisabledColor;
+                _cardTitleTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.78f, 0.78f, 0.78f, 1f);
+                _cardDescriptionTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.72f, 0.72f, 0.72f, 1f);
+                _cardCostTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.82f, 0.82f, 0.82f, 1f);
+            }
         }
 
         private void UpdateUnitDisplay(BattleUnit unit, Text nameText, Text hpText, Image hpFill)
@@ -101,15 +153,15 @@ namespace AshenPath.Battle
             hpFill.fillAmount = unit.CurrentHp / (float)unit.MaxHp;
         }
 
-        private Image CreateHpSection(Transform parent, Vector2 anchoredPosition, Color fillColor, out Text hpText)
+        private Image CreateHpSection(Transform parent, Vector2 anchoredPosition, Vector2 size, Color fillColor, out Text hpText)
         {
             var root = new GameObject("HpSection", typeof(RectTransform));
             root.transform.SetParent(parent, false);
             var rootRect = root.GetComponent<RectTransform>();
-            ConfigureRect(rootRect, anchoredPosition, new Vector2(680f, 72f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            ConfigureRect(rootRect, anchoredPosition, size, new Vector2(0f, 1f), new Vector2(0f, 1f));
 
             var barBackground = CreateImage("HpBarBackground", root.transform, new Color(0.12f, 0.13f, 0.16f, 1f));
-            ConfigureRect(barBackground.rectTransform, new Vector2(0f, -8f), new Vector2(680f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            ConfigureRect(barBackground.rectTransform, new Vector2(0f, -8f), new Vector2(size.x, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
             var fill = CreateImage("HpFill", barBackground.transform, fillColor);
             fill.type = Image.Type.Filled;
@@ -119,9 +171,106 @@ namespace AshenPath.Battle
             StretchFullScreen(fill.rectTransform);
 
             hpText = CreateText("HpText", root.transform, 24, TextAnchor.MiddleLeft, TextColor);
-            ConfigureRect(hpText.rectTransform, new Vector2(0f, -46f), new Vector2(420f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            ConfigureRect(hpText.rectTransform, new Vector2(0f, -46f), new Vector2(size.x, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
             return fill;
+        }
+
+        private Image CreateResourceSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, string label, out Text valueText)
+        {
+            var root = new GameObject(sectionName, typeof(RectTransform));
+            root.transform.SetParent(parent, false);
+            ConfigureRect(root.GetComponent<RectTransform>(), anchoredPosition, size, new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            var labelText = CreateText("Label", root.transform, 18, TextAnchor.MiddleLeft, new Color(0.76f, 0.82f, 0.94f, 1f));
+            labelText.text = label;
+            ConfigureRect(labelText.rectTransform, new Vector2(0f, -10f), new Vector2(52f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            var barBackground = CreateImage("BarBackground", root.transform, new Color(0.1f, 0.12f, 0.16f, 1f));
+            ConfigureRect(barBackground.rectTransform, new Vector2(60f, -8f), new Vector2(size.x - 60f, 18f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            var fill = CreateImage("Fill", barBackground.transform, fillColor);
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            fill.fillAmount = 1f;
+            StretchFullScreen(fill.rectTransform);
+
+            valueText = CreateText("Value", root.transform, 20, TextAnchor.MiddleLeft, TextColor);
+            ConfigureRect(valueText.rectTransform, new Vector2(60f, -34f), new Vector2(size.x - 60f, 22f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            return fill;
+        }
+
+        private void CreateArena(Transform parent)
+        {
+            var arena = CreatePanel("Arena", parent, new Vector2(0f, 44f), ArenaSize, new Vector2(0.5f, 0.5f));
+            arena.GetComponent<Image>().color = ArenaColor;
+
+            CreateActor(arena.transform, "EnemyActor", new Vector2(420f, 30f), EnemyAccent, "ENEMY");
+            CreateActor(arena.transform, "PlayerActor", new Vector2(-420f, 30f), PlayerAccent, "PLAYER");
+
+            var divider = CreateImage("Divider", arena.transform, new Color(0.22f, 0.24f, 0.28f, 1f));
+            ConfigureRect(divider.rectTransform, new Vector2(0f, 40f), new Vector2(2f, 320f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            var vsText = CreateText("VersusText", arena.transform, 40, TextAnchor.MiddleCenter, new Color(0.82f, 0.83f, 0.86f, 1f));
+            vsText.text = "VS";
+            ConfigureRect(vsText.rectTransform, new Vector2(0f, 0f), new Vector2(320f, 60f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        }
+
+        private void CreateCardHand(Transform parent)
+        {
+            var handRoot = new GameObject("CardHand", typeof(RectTransform));
+            handRoot.transform.SetParent(parent, false);
+            ConfigureRect(handRoot.GetComponent<RectTransform>(), new Vector2(0f, 30f), HandRootSize, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
+
+            const float cardWidth = 260f;
+            const float cardHeight = 180f;
+            const float spacing = 18f;
+            var totalWidth = (cardWidth * 5f) + (spacing * 4f);
+            var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
+
+            for (var i = 0; i < 5; i++)
+            {
+                var x = startX + i * (cardWidth + spacing);
+                var button = CreateCardButton(handRoot.transform, new Vector2(x, 0f), new Vector2(cardWidth, cardHeight));
+                _cardButtons.Add(button);
+                _cardBackgrounds.Add(button.GetComponent<Image>());
+
+                var title = CreateText("Title", button.transform, 28, TextAnchor.UpperLeft, DarkTextColor);
+                ConfigureRect(title.rectTransform, new Vector2(18f, -18f), new Vector2(cardWidth - 36f, 34f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                title.fontStyle = FontStyle.Bold;
+                title.horizontalOverflow = HorizontalWrapMode.Wrap;
+                title.verticalOverflow = VerticalWrapMode.Truncate;
+                _cardTitleTexts.Add(title);
+
+                var cost = CreateText("Cost", button.transform, 20, TextAnchor.UpperRight, DarkTextColor);
+                ConfigureRect(cost.rectTransform, new Vector2(-18f, -18f), new Vector2(96f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+                cost.fontStyle = FontStyle.Bold;
+                _cardCostTexts.Add(cost);
+
+                var description = CreateText("Description", button.transform, 22, TextAnchor.UpperLeft, DarkTextColor);
+                ConfigureRect(description.rectTransform, new Vector2(18f, -62f), new Vector2(cardWidth - 36f, 86f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                description.horizontalOverflow = HorizontalWrapMode.Wrap;
+                description.verticalOverflow = VerticalWrapMode.Truncate;
+                _cardDescriptionTexts.Add(description);
+            }
+        }
+
+        private GameObject CreateActor(Transform parent, string actorName, Vector2 anchoredPosition, Color accentColor, string label)
+        {
+            var actorRoot = new GameObject(actorName, typeof(RectTransform));
+            actorRoot.transform.SetParent(parent, false);
+            ConfigureRect(actorRoot.GetComponent<RectTransform>(), anchoredPosition, new Vector2(220f, 320f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            var body = CreateImage("Body", actorRoot.transform, accentColor);
+            ConfigureRect(body.rectTransform, new Vector2(0f, 0f), new Vector2(160f, 220f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            var labelText = CreateText("ActorLabel", actorRoot.transform, 26, TextAnchor.MiddleCenter, TextColor);
+            labelText.text = label;
+            ConfigureRect(labelText.rectTransform, new Vector2(0f, 0f), new Vector2(140f, 32f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            return actorRoot;
         }
 
         private GameObject CreatePanel(string panelName, Transform parent, Vector2 anchoredPosition, Vector2 size, Vector2 anchor)
@@ -134,27 +283,24 @@ namespace AshenPath.Battle
             return panel;
         }
 
-        private Button CreateButton(Transform parent, Vector2 anchoredPosition, Vector2 size, Vector2 anchor)
+        private Button CreateCardButton(Transform parent, Vector2 anchoredPosition, Vector2 size)
         {
-            var buttonObject = new GameObject("AttackButton", typeof(Image), typeof(Button));
+            var buttonObject = new GameObject("CardButton", typeof(Image), typeof(Button));
             buttonObject.transform.SetParent(parent, false);
 
             var image = buttonObject.GetComponent<Image>();
-            image.color = PlayerAccent;
+            image.color = CardColor;
 
             var button = buttonObject.GetComponent<Button>();
             var colors = button.colors;
-            colors.normalColor = PlayerAccent;
-            colors.highlightedColor = new Color(0.4f, 0.8f, 0.66f, 1f);
-            colors.pressedColor = new Color(0.24f, 0.58f, 0.46f, 1f);
-            colors.disabledColor = new Color(0.24f, 0.28f, 0.32f, 0.9f);
+            colors.normalColor = CardColor;
+            colors.highlightedColor = new Color(0.95f, 0.89f, 0.75f, 1f);
+            colors.pressedColor = new Color(0.79f, 0.72f, 0.58f, 1f);
+            colors.disabledColor = CardDisabledColor;
             colors.selectedColor = colors.highlightedColor;
             button.colors = colors;
 
-            ConfigureRect(image.rectTransform, anchoredPosition, size, anchor, anchor);
-
-            var label = CreateText("Label", buttonObject.transform, 30, TextAnchor.MiddleCenter, TextColor);
-            StretchFullScreen(label.rectTransform);
+            ConfigureRect(image.rectTransform, anchoredPosition, size, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
             return button;
         }
