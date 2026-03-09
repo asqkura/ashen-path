@@ -1,0 +1,9 @@
+# 例:
+# feat: add player movement
+# fix: correct jump timing
+# chore: initialize git settings
+#
+# 推奨 prefix:
+# feat, fix, chore, docs, refactor, test, perf, ci, build
+
+type: summary
