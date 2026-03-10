@@ -13,6 +13,11 @@ namespace AshenPath.Battle
         private const int OpeningHandSize = 5;
         private const int TurnDrawCount = 2;
         private const int MaxCardsPerTurn = 3;
+        private const int MaxDeckSwaps = 5;
+        private const int MaxNeutralCards = 4;
+        private const int MaxSupportCards = 3;
+        private const int MinPrimaryCards = 6;
+        private const int MaxCopiesPerCard = 2;
 
         private enum BattleState
         {
@@ -54,7 +59,10 @@ namespace AshenPath.Battle
         private BattleCardResolver _cardResolver;
         private BattleCardResolver.TurnEffectState _turnEffectState;
         private readonly List<int> _selectedCardIndices = new();
+        private readonly List<string> _editingDeckCardIds = new();
+        private readonly List<string> _baseDeckCardIds = new();
         private int _selectedDeckPresetIndex;
+        private int _selectedDeckSlotIndex = -1;
 
         public void Initialize(BattleUI battleUI)
         {
@@ -95,7 +103,7 @@ namespace AshenPath.Battle
             _state = BattleState.DeckEditing;
 
             _battleUI.SetBattleScreenVisible(false);
-            _battleUI.ShowDeckEditor(_deckPresets, GetSelectedDeckPresetId(), RequiredDeckSize);
+            RefreshDeckEditorUi("ぬめの想定デッキを選んで、5枚まで差し替えられるぬめ");
             _battleUI.SetResultText(string.Empty, false);
             _battleUI.ClearBattleLog();
             _battleUI.SetTurnText("デッキを選んでください");
@@ -112,8 +120,45 @@ namespace AshenPath.Battle
 
             _selectedDeckPresetIndex = presetIndex;
             ApplySelectedDeckPreset();
-            _battleUI.SetDeckEditorHint("このデッキで戦闘開始できるぬめ");
-            _battleUI.SetDeckEditorSelection(GetSelectedDeckPresetId(), RequiredDeckSize);
+            RefreshDeckEditorUi("差し替える枠を選んで、下の候補から入れ替えるぬめ");
+        }
+
+        public void SelectDeckSlot(int slotIndex)
+        {
+            if (_state != BattleState.DeckEditing || slotIndex < 0 || slotIndex >= _editingDeckCardIds.Count)
+            {
+                return;
+            }
+
+            _selectedDeckSlotIndex = slotIndex;
+            RefreshDeckEditorUi("下の候補カードを押すと、この枠と差し替えるぬめ");
+        }
+
+        public void SelectCatalogCard(int cardIndex)
+        {
+            if (_state != BattleState.DeckEditing || _selectedDeckSlotIndex < 0 || _selectedDeckSlotIndex >= _editingDeckCardIds.Count)
+            {
+                return;
+            }
+
+            if (cardIndex < 0 || cardIndex >= _deckRuntime.AllCards.Count)
+            {
+                return;
+            }
+
+            var selectedCard = _deckRuntime.AllCards[cardIndex];
+            if (selectedCard == null)
+            {
+                return;
+            }
+
+            if (!TryReplaceEditingDeckCard(_selectedDeckSlotIndex, selectedCard.id, out var message))
+            {
+                RefreshDeckEditorUi(message);
+                return;
+            }
+
+            RefreshDeckEditorUi($"{selectedCard.cardName} を編成したぬめ");
         }
 
         public void ConfirmDeckSelection()
@@ -751,7 +796,18 @@ namespace AshenPath.Battle
                 return;
             }
 
-            _deckRuntime.ReplaceSelectedDeckByIds(_deckPresets[_selectedDeckPresetIndex].cardIds);
+            _baseDeckCardIds.Clear();
+            _editingDeckCardIds.Clear();
+
+            var presetCardIds = _deckPresets[_selectedDeckPresetIndex].cardIds;
+            for (var i = 0; i < presetCardIds.Count; i++)
+            {
+                _baseDeckCardIds.Add(presetCardIds[i]);
+                _editingDeckCardIds.Add(presetCardIds[i]);
+            }
+
+            _selectedDeckSlotIndex = _editingDeckCardIds.Count > 0 ? 0 : -1;
+            _deckRuntime.ReplaceSelectedDeckByIds(_editingDeckCardIds);
         }
 
         private string GetSelectedDeckPresetId()
@@ -762,6 +818,259 @@ namespace AshenPath.Battle
             }
 
             return _deckPresets[_selectedDeckPresetIndex].id;
+        }
+
+        private void RefreshDeckEditorUi(string hintMessage)
+        {
+            if (_battleUI == null)
+            {
+                return;
+            }
+
+            _battleUI.ShowDeckEditor(
+                _deckPresets,
+                GetSelectedDeckPresetId(),
+                GetEditingDeckCards(),
+                _editingDeckCardIds,
+                _selectedDeckSlotIndex,
+                _deckRuntime.AllCards,
+                GetCatalogInteractableIndices(),
+                GetDeckSummaryText());
+            _battleUI.SetDeckEditorHint(hintMessage);
+            _battleUI.SetDeckEditorSelection(GetSelectedDeckPresetId(), RequiredDeckSize, GetRemainingSwapCount(), CanStartBattleFromEditor());
+        }
+
+        private List<BattleCardData> GetEditingDeckCards()
+        {
+            var cards = new List<BattleCardData>(_editingDeckCardIds.Count);
+            for (var i = 0; i < _editingDeckCardIds.Count; i++)
+            {
+                var card = _deckRuntime.FindCardById(_editingDeckCardIds[i]);
+                if (card != null)
+                {
+                    cards.Add(card);
+                }
+            }
+
+            return cards;
+        }
+
+        private List<int> GetCatalogInteractableIndices()
+        {
+            var indices = new List<int>();
+            for (var i = 0; i < _deckRuntime.AllCards.Count; i++)
+            {
+                var card = _deckRuntime.AllCards[i];
+                if (card == null)
+                {
+                    continue;
+                }
+
+                if (_selectedDeckSlotIndex < 0 || CanReplaceEditingDeckCard(_selectedDeckSlotIndex, card.id))
+                {
+                    indices.Add(i);
+                }
+            }
+
+            return indices;
+        }
+
+        private bool TryReplaceEditingDeckCard(int slotIndex, string cardId, out string message)
+        {
+            message = string.Empty;
+            if (!CanReplaceEditingDeckCard(slotIndex, cardId, out message))
+            {
+                return false;
+            }
+
+            _editingDeckCardIds[slotIndex] = cardId;
+            _deckRuntime.ReplaceSelectedDeckByIds(_editingDeckCardIds);
+            return true;
+        }
+
+        private bool CanReplaceEditingDeckCard(int slotIndex, string cardId)
+        {
+            return CanReplaceEditingDeckCard(slotIndex, cardId, out _);
+        }
+
+        private bool CanReplaceEditingDeckCard(int slotIndex, string cardId, out string message)
+        {
+            message = string.Empty;
+            if (slotIndex < 0 || slotIndex >= _editingDeckCardIds.Count)
+            {
+                message = "差し替える枠を先に選ぶぬめ";
+                return false;
+            }
+
+            var primaryElement = _deckPresets[_selectedDeckPresetIndex].primaryElement;
+            var candidateDeck = new List<string>(_editingDeckCardIds);
+            candidateDeck[slotIndex] = cardId;
+
+            if (CountCopies(candidateDeck, cardId) > MaxCopiesPerCard)
+            {
+                message = "同じカードは2枚までぬめ";
+                return false;
+            }
+
+            var neutralCount = 0;
+            var primaryCount = 0;
+            var supportCount = 0;
+            for (var i = 0; i < candidateDeck.Count; i++)
+            {
+                var card = _deckRuntime.FindCardById(candidateDeck[i]);
+                if (card == null)
+                {
+                    continue;
+                }
+
+                if (card.elementType == ElementType.None)
+                {
+                    neutralCount++;
+                }
+                else if (card.elementType == primaryElement)
+                {
+                    primaryCount++;
+                }
+                else
+                {
+                    supportCount++;
+                }
+            }
+
+            if (neutralCount > MaxNeutralCards)
+            {
+                message = "無属性は4枚までぬめ";
+                return false;
+            }
+
+            if (supportCount > MaxSupportCards)
+            {
+                message = "補助属性は3枚までぬめ";
+                return false;
+            }
+
+            if (primaryElement != ElementType.None && primaryCount < MinPrimaryCards)
+            {
+                message = "主属性カードは6枚以上ほしいぬめ";
+                return false;
+            }
+
+            if (GetSwapCount(candidateDeck) > MaxDeckSwaps)
+            {
+                message = "差し替えは5枚までぬめ";
+                return false;
+            }
+
+            return true;
+        }
+
+        private int GetRemainingSwapCount()
+        {
+            return Mathf.Max(0, MaxDeckSwaps - GetSwapCount(_editingDeckCardIds));
+        }
+
+        private int GetSwapCount(List<string> deckCardIds)
+        {
+            var swapCount = 0;
+            var count = Mathf.Min(deckCardIds.Count, _baseDeckCardIds.Count);
+            for (var i = 0; i < count; i++)
+            {
+                if (deckCardIds[i] != _baseDeckCardIds[i])
+                {
+                    swapCount++;
+                }
+            }
+
+            return swapCount;
+        }
+
+        private bool CanStartBattleFromEditor()
+        {
+            if (_editingDeckCardIds.Count != RequiredDeckSize)
+            {
+                return false;
+            }
+
+            return GetRemainingSwapCount() >= 0;
+        }
+
+        private string GetDeckSummaryText()
+        {
+            var primaryElement = _deckPresets.Count > 0 ? _deckPresets[_selectedDeckPresetIndex].primaryElement : ElementType.None;
+            var primaryCount = 0;
+            var neutralCount = 0;
+            var supportCount = 0;
+            var totalSp = 0;
+            var defenseCount = 0;
+            var finisherCount = 0;
+
+            for (var i = 0; i < _editingDeckCardIds.Count; i++)
+            {
+                var card = _deckRuntime.FindCardById(_editingDeckCardIds[i]);
+                if (card == null)
+                {
+                    continue;
+                }
+
+                totalSp += card.spCost;
+                if (card.elementType == ElementType.None)
+                {
+                    neutralCount++;
+                }
+                else if (card.elementType == primaryElement)
+                {
+                    primaryCount++;
+                }
+                else
+                {
+                    supportCount++;
+                }
+
+                if (card.damage >= 18)
+                {
+                    finisherCount++;
+                }
+
+                if (card.damage == 0 || CardHasEffect(card, BattleCardEffectType.Heal) || CardHasEffect(card, BattleCardEffectType.GainBarrier))
+                {
+                    defenseCount++;
+                }
+            }
+
+            var averageSp = _editingDeckCardIds.Count > 0 ? totalSp / (float)_editingDeckCardIds.Count : 0f;
+            return $"主属性 {primaryCount}/{MinPrimaryCards}  無 {neutralCount}/{MaxNeutralCards}  補助 {supportCount}/{MaxSupportCards}  差し替え {GetSwapCount(_editingDeckCardIds)}/{MaxDeckSwaps}\n平均SP {averageSp:0.0}  守り {defenseCount}  締め {finisherCount}";
+        }
+
+        private static int CountCopies(List<string> deckCardIds, string cardId)
+        {
+            var count = 0;
+            for (var i = 0; i < deckCardIds.Count; i++)
+            {
+                if (deckCardIds[i] == cardId)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static bool CardHasEffect(BattleCardData card, BattleCardEffectType effectType)
+        {
+            if (card?.effects == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < card.effects.Count; i++)
+            {
+                if (card.effects[i] != null && card.effects[i].effectType == effectType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static BattleDeckPresetData CreateDeckPreset(string id, string displayName, string description, ElementType primaryElement, params string[] cardIds)

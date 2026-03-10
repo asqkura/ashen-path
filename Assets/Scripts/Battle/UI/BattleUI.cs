@@ -74,6 +74,8 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _selectedCardPreviewDescription;
         private GameObject _selectedCardKeywordTooltipRoot;
         private TextMeshProUGUI _selectedCardKeywordTooltipText;
+        private ScrollRect _deckCatalogScrollRect;
+        private RectTransform _deckCatalogContentRect;
         private readonly Queue<string> _battleLogs = new();
         private readonly List<BattleCardData> _currentHandCards = new();
         private readonly List<Button> _cardButtons = new();
@@ -91,6 +93,20 @@ namespace AshenPath.Battle
         private readonly List<TextMeshProUGUI> _deckCardCostTexts = new();
         private readonly List<Image> _deckCardBackgrounds = new();
         private readonly List<Outline> _deckCardOutlines = new();
+        private readonly List<Button> _deckPresetButtons = new();
+        private readonly List<string> _deckPresetIds = new();
+        private readonly List<TextMeshProUGUI> _deckPresetTitleTexts = new();
+        private readonly List<TextMeshProUGUI> _deckPresetDescriptionTexts = new();
+        private readonly List<TextMeshProUGUI> _deckPresetCostTexts = new();
+        private readonly List<Image> _deckPresetBackgrounds = new();
+        private readonly List<Outline> _deckPresetOutlines = new();
+        private readonly List<Button> _deckSlotButtons = new();
+        private readonly List<TextMeshProUGUI> _deckSlotTitleTexts = new();
+        private readonly List<TextMeshProUGUI> _deckSlotDescriptionTexts = new();
+        private readonly List<TextMeshProUGUI> _deckSlotCostTexts = new();
+        private readonly List<Image> _deckSlotBackgrounds = new();
+        private readonly List<Outline> _deckSlotOutlines = new();
+        private TextMeshProUGUI _deckSummaryText;
         private readonly StringBuilder _logBuilder = new();
         private Sprite _roundedPanelSprite;
         private Sprite _solidFillSprite;
@@ -194,11 +210,25 @@ namespace AshenPath.Battle
                 _confirmButton.onClick.AddListener(controller.EndPlayerTurn);
             }
 
+            for (var i = 0; i < _deckPresetButtons.Count; i++)
+            {
+                var presetIndex = i;
+                _deckPresetButtons[i].onClick.RemoveAllListeners();
+                _deckPresetButtons[i].onClick.AddListener(() => controller.SelectDeckPreset(presetIndex));
+            }
+
+            for (var i = 0; i < _deckSlotButtons.Count; i++)
+            {
+                var slotIndex = i;
+                _deckSlotButtons[i].onClick.RemoveAllListeners();
+                _deckSlotButtons[i].onClick.AddListener(() => controller.SelectDeckSlot(slotIndex));
+            }
+
             for (var i = 0; i < _deckCardButtons.Count; i++)
             {
-                var deckCardIndex = i;
+                var catalogIndex = i;
                 _deckCardButtons[i].onClick.RemoveAllListeners();
-                _deckCardButtons[i].onClick.AddListener(() => controller.SelectDeckPreset(deckCardIndex));
+                _deckCardButtons[i].onClick.AddListener(() => controller.SelectCatalogCard(catalogIndex));
             }
 
             if (_deckEditorStartButton != null)
@@ -405,7 +435,15 @@ namespace AshenPath.Battle
             }
         }
 
-        public void ShowDeckEditor(IReadOnlyList<BattleDeckPresetData> presets, string selectedPresetId, int requiredDeckSize)
+        public void ShowDeckEditor(
+            IReadOnlyList<BattleDeckPresetData> presets,
+            string selectedPresetId,
+            IReadOnlyList<BattleCardData> editingDeck,
+            IReadOnlyList<string> editingDeckCardIds,
+            int selectedDeckSlotIndex,
+            IReadOnlyList<BattleCardData> catalogCards,
+            IReadOnlyCollection<int> interactableCatalogIndices,
+            string deckSummary)
         {
             if (_deckEditorPanel == null)
             {
@@ -413,9 +451,24 @@ namespace AshenPath.Battle
             }
 
             _deckEditorPanel.SetActive(true);
-            RefreshDeckEditor(presets);
-            SetDeckEditorHint("ぬめの想定デッキから1つ選ぶぬめ");
-            SetDeckEditorSelection(selectedPresetId, requiredDeckSize);
+            RefreshDeckEditorPresets(presets);
+            RefreshDeckEditorDeck(editingDeck, selectedDeckSlotIndex);
+            RefreshDeckEditorCatalog(catalogCards, editingDeckCardIds, interactableCatalogIndices);
+            if (_deckSummaryText != null)
+            {
+                _deckSummaryText.text = deckSummary;
+            }
+
+            if (_deckCatalogScrollRect != null && _deckCatalogContentRect != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                _deckCatalogContentRect.anchoredPosition = Vector2.zero;
+                _deckCatalogScrollRect.verticalNormalizedPosition = 0f;
+                if (_deckCatalogScrollRect.verticalScrollbar != null)
+                {
+                    _deckCatalogScrollRect.verticalScrollbar.value = 1f;
+                }
+            }
         }
 
         public void HideDeckEditor()
@@ -426,25 +479,24 @@ namespace AshenPath.Battle
             }
         }
 
-        public void SetDeckEditorSelection(string selectedPresetId, int requiredDeckSize)
+        public void SetDeckEditorSelection(string selectedPresetId, int requiredDeckSize, int remainingSwaps, bool canStart)
         {
-            for (var i = 0; i < _deckCardButtons.Count; i++)
+            for (var i = 0; i < _deckPresetButtons.Count; i++)
             {
-                var isSelected = !string.IsNullOrWhiteSpace(selectedPresetId) && selectedPresetId == _deckCardIds[i];
-                _deckCardOutlines[i].enabled = isSelected;
-                _deckCardBackgrounds[i].transform.localScale = isSelected ? new Vector3(1.04f, 1.04f, 1f) : Vector3.one;
+                var isSelected = !string.IsNullOrWhiteSpace(selectedPresetId) && selectedPresetId == _deckPresetIds[i];
+                _deckPresetOutlines[i].enabled = isSelected;
+                _deckPresetBackgrounds[i].transform.localScale = isSelected ? new Vector3(1.04f, 1.04f, 1f) : Vector3.one;
             }
 
             if (_deckEditorCountText != null)
             {
-                _deckEditorCountText.text = $"DECK {requiredDeckSize} / {requiredDeckSize}";
+                _deckEditorCountText.text = $"DECK {requiredDeckSize} / {requiredDeckSize}  SWAP {remainingSwaps}";
             }
 
             if (_deckEditorStartButton != null)
             {
-                var canStart = !string.IsNullOrWhiteSpace(selectedPresetId);
                 _deckEditorStartButton.interactable = canStart;
-                _deckEditorStartButtonText.text = canStart ? "戦闘開始" : "デッキ選択";
+                _deckEditorStartButtonText.text = canStart ? "戦闘開始" : "構築不足";
             }
         }
 
@@ -834,6 +886,10 @@ namespace AshenPath.Battle
             _deckEditorHintText = CreateText("DeckEditorHint", _deckEditorPanel.transform, 24, TextAnchor.MiddleLeft, new Color(0.82f, 0.86f, 0.92f, 1f));
             ConfigureRect(_deckEditorHintText.rectTransform, new Vector2(32f, -78f), new Vector2(720f, 30f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
+            _deckSummaryText = CreateText("DeckEditorSummary", _deckEditorPanel.transform, 21, TextAnchor.UpperRight, new Color(0.9f, 0.92f, 0.96f, 1f));
+            _deckSummaryText.textWrappingMode = TextWrappingModes.Normal;
+            ConfigureRect(_deckSummaryText.rectTransform, new Vector2(-32f, -76f), new Vector2(860f, 56f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+
             _deckEditorStartButton = CreateCardButton(_deckEditorPanel.transform, Vector2.zero, new Vector2(220f, 68f));
             ConfigureRect(_deckEditorStartButton.GetComponent<RectTransform>(), new Vector2(-32f, 32f), new Vector2(220f, 68f), new Vector2(1f, 0f), new Vector2(1f, 0f));
             _deckEditorStartButton.GetComponent<Image>().color = new Color(0.84f, 0.74f, 0.52f, 1f);
@@ -842,27 +898,21 @@ namespace AshenPath.Battle
             _deckEditorStartButtonText.text = "戦闘開始";
             ConfigureRect(_deckEditorStartButtonText.rectTransform, Vector2.zero, new Vector2(220f, 68f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
-            var gridRoot = new GameObject("DeckGrid", typeof(RectTransform));
-            gridRoot.transform.SetParent(_deckEditorPanel.transform, false);
-            ConfigureRect(gridRoot.GetComponent<RectTransform>(), new Vector2(0f, -28f), new Vector2(1720f, 760f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            const float columnTop = -128f;
+            const float columnHeight = 780f;
 
-            const int columns = 10;
-            const float cardWidth = 156f;
-            const float cardHeight = 116f;
-            const float spacingX = 14f;
-            const float spacingY = 14f;
-            var totalWidth = columns * cardWidth + (columns - 1) * spacingX;
-            var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
+            var presetPanel = CreatePanel("PresetColumn", _deckEditorPanel.transform, new Vector2(32f, columnTop), new Vector2(420f, columnHeight), new Vector2(0f, 1f));
+            presetPanel.GetComponent<Image>().color = new Color(0.11f, 0.12f, 0.16f, 0.96f);
+            var presetLabel = CreateText("PresetLabel", presetPanel.transform, 24, TextAnchor.MiddleLeft, new Color(0.96f, 0.88f, 0.68f, 1f));
+            presetLabel.text = "プリセット";
+            ConfigureRect(presetLabel.rectTransform, new Vector2(20f, -18f), new Vector2(160f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
-            for (var i = 0; i < 90; i++)
+            for (var i = 0; i < 6; i++)
             {
-                var row = i / columns;
-                var column = i % columns;
-                var x = startX + column * (cardWidth + spacingX);
-                var y = 300f - row * (cardHeight + spacingY);
-
-                var button = CreateCardButton(gridRoot.transform, new Vector2(x, y), new Vector2(cardWidth, cardHeight));
-                var visual = CreateCardVisual(button.transform, new Vector2(cardWidth, cardHeight));
+                var y = -72f - i * 112f;
+                var button = CreateCardButton(presetPanel.transform, new Vector2(0f, y), new Vector2(380f, 92f));
+                ConfigureRect(button.GetComponent<RectTransform>(), new Vector2(0f, y), new Vector2(380f, 92f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+                var visual = CreateCardVisual(button.transform, new Vector2(380f, 92f));
                 button.targetGraphic = visual;
 
                 var outline = visual.GetComponent<Outline>();
@@ -870,24 +920,159 @@ namespace AshenPath.Battle
                 outline.effectDistance = new Vector2(3f, -3f);
                 outline.enabled = false;
 
-                var titleText = CreateText("DeckTitle", visual.transform, 20, TextAnchor.UpperLeft, DarkTextColor);
+                var titleText = CreateText("PresetTitle", visual.transform, 21, TextAnchor.UpperLeft, DarkTextColor);
                 titleText.fontStyle = FontStyles.Bold;
-                titleText.textWrappingMode = TextWrappingModes.Normal;
-                titleText.overflowMode = TextOverflowModes.Truncate;
-                ConfigureRect(titleText.rectTransform, new Vector2(10f, -8f), new Vector2(cardWidth - 20f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(titleText.rectTransform, new Vector2(12f, -10f), new Vector2(240f, 22f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
-                var metaBand = CreateRoundedImage("DeckMetaBand", visual.transform, new Color(1f, 1f, 1f, 0.34f));
-                metaBand.raycastTarget = false;
-                ConfigureRect(metaBand.rectTransform, new Vector2(10f, -32f), new Vector2(cardWidth - 20f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-
-                var costText = CreateText("DeckCost", visual.transform, 16, TextAnchor.UpperLeft, DarkTextColor);
+                var costText = CreateText("PresetCost", visual.transform, 15, TextAnchor.UpperRight, DarkTextColor);
                 costText.fontStyle = FontStyles.Bold;
-                ConfigureRect(costText.rectTransform, new Vector2(16f, -34f), new Vector2(cardWidth - 28f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(costText.rectTransform, new Vector2(-12f, -10f), new Vector2(120f, 20f), new Vector2(1f, 1f), new Vector2(1f, 1f));
 
-                var descriptionText = CreateText("DeckDescription", visual.transform, 14, TextAnchor.UpperLeft, DarkTextColor);
+                var descriptionText = CreateText("PresetDescription", visual.transform, 14, TextAnchor.UpperLeft, DarkTextColor);
                 descriptionText.textWrappingMode = TextWrappingModes.Normal;
                 descriptionText.overflowMode = TextOverflowModes.Truncate;
-                ConfigureRect(descriptionText.rectTransform, new Vector2(10f, -56f), new Vector2(cardWidth - 20f, 48f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(descriptionText.rectTransform, new Vector2(12f, -38f), new Vector2(356f, 42f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+                button.gameObject.SetActive(false);
+                _deckPresetButtons.Add(button);
+                _deckPresetIds.Add(string.Empty);
+                _deckPresetTitleTexts.Add(titleText);
+                _deckPresetCostTexts.Add(costText);
+                _deckPresetDescriptionTexts.Add(descriptionText);
+                _deckPresetBackgrounds.Add(visual);
+                _deckPresetOutlines.Add(outline);
+            }
+
+            var deckPanel = CreatePanel("DeckColumn", _deckEditorPanel.transform, new Vector2(484f, columnTop), new Vector2(420f, columnHeight), new Vector2(0f, 1f));
+            deckPanel.GetComponent<Image>().color = new Color(0.11f, 0.12f, 0.16f, 0.96f);
+            var deckLabel = CreateText("CurrentDeckLabel", deckPanel.transform, 24, TextAnchor.MiddleLeft, new Color(0.96f, 0.88f, 0.68f, 1f));
+            deckLabel.text = "現在のデッキ";
+            ConfigureRect(deckLabel.rectTransform, new Vector2(20f, -18f), new Vector2(180f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            for (var i = 0; i < 15; i++)
+            {
+                var y = -60f - i * 46f;
+                var button = CreateCardButton(deckPanel.transform, Vector2.zero, new Vector2(380f, 38f));
+                ConfigureRect(button.GetComponent<RectTransform>(), new Vector2(0f, y), new Vector2(380f, 38f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+                var visual = CreateCardVisual(button.transform, new Vector2(380f, 38f));
+                button.targetGraphic = visual;
+
+                var outline = visual.GetComponent<Outline>();
+                outline.effectColor = new Color(1f, 0.9f, 0.6f, 1f);
+                outline.effectDistance = new Vector2(2f, -2f);
+                outline.enabled = false;
+
+                var titleText = CreateText("DeckSlotTitle", visual.transform, 16, TextAnchor.MiddleLeft, DarkTextColor);
+                titleText.fontStyle = FontStyles.Bold;
+                ConfigureRect(titleText.rectTransform, new Vector2(10f, 0f), new Vector2(212f, 22f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+
+                var costText = CreateText("DeckSlotCost", visual.transform, 13, TextAnchor.MiddleCenter, DarkTextColor);
+                costText.fontStyle = FontStyles.Bold;
+                ConfigureRect(costText.rectTransform, new Vector2(254f, 0f), new Vector2(76f, 20f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+
+                var descriptionText = CreateText("DeckSlotDescription", visual.transform, 12, TextAnchor.MiddleLeft, DarkTextColor);
+                descriptionText.textWrappingMode = TextWrappingModes.NoWrap;
+                descriptionText.overflowMode = TextOverflowModes.Truncate;
+                ConfigureRect(descriptionText.rectTransform, new Vector2(332f, 0f), new Vector2(38f, 20f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+
+                _deckSlotButtons.Add(button);
+                _deckSlotTitleTexts.Add(titleText);
+                _deckSlotCostTexts.Add(costText);
+                _deckSlotDescriptionTexts.Add(descriptionText);
+                _deckSlotBackgrounds.Add(visual);
+                _deckSlotOutlines.Add(outline);
+            }
+
+            var catalogPanel = CreatePanel("CatalogColumn", _deckEditorPanel.transform, new Vector2(936f, columnTop), new Vector2(852f, columnHeight), new Vector2(0f, 1f));
+            catalogPanel.GetComponent<Image>().color = new Color(0.11f, 0.12f, 0.16f, 0.96f);
+            var catalogLabel = CreateText("CatalogLabel", catalogPanel.transform, 24, TextAnchor.MiddleLeft, new Color(0.96f, 0.88f, 0.68f, 1f));
+            catalogLabel.text = "候補カード";
+            ConfigureRect(catalogLabel.rectTransform, new Vector2(20f, -18f), new Vector2(180f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            var catalogScrollRoot = new GameObject("CatalogScrollRoot", typeof(RectTransform), typeof(ScrollRect));
+            catalogScrollRoot.transform.SetParent(catalogPanel.transform, false);
+            var catalogScrollRectRect = catalogScrollRoot.GetComponent<RectTransform>();
+            ConfigureRect(catalogScrollRectRect, new Vector2(0f, -48f), new Vector2(812f, 700f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+
+            var viewport = CreateRoundedImage("CatalogViewport", catalogScrollRoot.transform, new Color(1f, 1f, 1f, 0.02f));
+            ConfigureRect(viewport.rectTransform, Vector2.zero, new Vector2(780f, 700f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            var viewportMask = viewport.gameObject.AddComponent<Mask>();
+            viewportMask.showMaskGraphic = false;
+
+            var gridRoot = new GameObject("CatalogContent", typeof(RectTransform));
+            gridRoot.transform.SetParent(viewport.transform, false);
+            var gridRootRect = gridRoot.GetComponent<RectTransform>();
+            _deckCatalogContentRect = gridRootRect;
+            const int catalogCapacity = 90;
+            const float catalogCardWidth = 748f;
+            const float catalogCardHeight = 58f;
+            const float catalogSpacingY = 8f;
+            var contentHeight = (catalogCapacity * catalogCardHeight) + ((catalogCapacity - 1) * catalogSpacingY);
+            gridRootRect.anchorMin = new Vector2(0f, 1f);
+            gridRootRect.anchorMax = new Vector2(0f, 1f);
+            gridRootRect.pivot = new Vector2(0f, 1f);
+            gridRootRect.sizeDelta = new Vector2(catalogCardWidth, contentHeight);
+            gridRootRect.anchoredPosition = Vector2.zero;
+            gridRootRect.localScale = Vector3.one;
+
+            var catalogScrollRect = catalogScrollRoot.GetComponent<ScrollRect>();
+            _deckCatalogScrollRect = catalogScrollRect;
+            catalogScrollRect.horizontal = false;
+            catalogScrollRect.vertical = true;
+            catalogScrollRect.movementType = ScrollRect.MovementType.Clamped;
+            catalogScrollRect.scrollSensitivity = 24f;
+            catalogScrollRect.viewport = viewport.rectTransform;
+            catalogScrollRect.content = gridRootRect;
+            catalogScrollRect.verticalNormalizedPosition = 0f;
+
+            var scrollbarRoot = CreateRoundedImage("CatalogScrollbar", catalogScrollRoot.transform, new Color(1f, 1f, 1f, 0.08f));
+            ConfigureRect(scrollbarRoot.rectTransform, new Vector2(-8f, 0f), new Vector2(14f, 700f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+            var scrollbar = scrollbarRoot.gameObject.AddComponent<Scrollbar>();
+
+            var slidingArea = new GameObject("SlidingArea", typeof(RectTransform));
+            slidingArea.transform.SetParent(scrollbarRoot.transform, false);
+            ConfigureRect(slidingArea.GetComponent<RectTransform>(), Vector2.zero, new Vector2(14f, 700f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            var handleImage = CreateRoundedImage("Handle", slidingArea.transform, new Color(0.92f, 0.82f, 0.58f, 0.95f));
+            ConfigureRect(handleImage.rectTransform, Vector2.zero, new Vector2(14f, 120f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+            scrollbar.handleRect = handleImage.rectTransform;
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.size = 0.25f;
+            scrollbar.value = 1f;
+            catalogScrollRect.verticalScrollbar = scrollbar;
+            catalogScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+
+            for (var i = 0; i < catalogCapacity; i++)
+            {
+                var y = -i * (catalogCardHeight + catalogSpacingY);
+                var button = CreateCardButton(gridRoot.transform, Vector2.zero, new Vector2(catalogCardWidth, catalogCardHeight));
+                ConfigureRect(button.GetComponent<RectTransform>(), new Vector2(0f, y), new Vector2(catalogCardWidth, catalogCardHeight), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                var visual = CreateCardVisual(button.transform, new Vector2(catalogCardWidth, catalogCardHeight));
+                button.targetGraphic = visual;
+
+                var outline = visual.GetComponent<Outline>();
+                outline.effectColor = new Color(1f, 0.92f, 0.58f, 1f);
+                outline.effectDistance = new Vector2(2f, -2f);
+                outline.enabled = false;
+
+                var titleText = CreateText("CatalogTitle", visual.transform, 18, TextAnchor.MiddleLeft, DarkTextColor);
+                titleText.fontStyle = FontStyles.Bold;
+                ConfigureRect(titleText.rectTransform, new Vector2(12f, 0f), new Vector2(200f, 22f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+
+                var metaBand = CreateRoundedImage("CatalogMetaBand", visual.transform, new Color(1f, 1f, 1f, 0.34f));
+                ConfigureRect(metaBand.rectTransform, new Vector2(230f, 0f), new Vector2(126f, 22f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+                metaBand.raycastTarget = false;
+
+                var costText = CreateText("CatalogCost", visual.transform, 15, TextAnchor.MiddleCenter, DarkTextColor);
+                costText.fontStyle = FontStyles.Bold;
+                ConfigureRect(costText.rectTransform, new Vector2(230f, 0f), new Vector2(126f, 22f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+
+                var descriptionText = CreateText("CatalogDescription", visual.transform, 14, TextAnchor.MiddleLeft, DarkTextColor);
+                descriptionText.textWrappingMode = TextWrappingModes.NoWrap;
+                descriptionText.overflowMode = TextOverflowModes.Truncate;
+                ConfigureRect(descriptionText.rectTransform, new Vector2(374f, 0f), new Vector2(360f, 22f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
 
                 button.gameObject.SetActive(false);
                 _deckCardButtons.Add(button);
@@ -900,25 +1085,87 @@ namespace AshenPath.Battle
             }
         }
 
-        private void RefreshDeckEditor(IReadOnlyList<BattleDeckPresetData> presets)
+        private void RefreshDeckEditorPresets(IReadOnlyList<BattleDeckPresetData> presets)
         {
-            for (var i = 0; i < _deckCardButtons.Count; i++)
+            for (var i = 0; i < _deckPresetButtons.Count; i++)
             {
                 var hasPreset = presets != null && i < presets.Count;
-                _deckCardButtons[i].gameObject.SetActive(hasPreset);
-                _deckCardIds[i] = hasPreset ? presets[i].id : string.Empty;
+                _deckPresetButtons[i].gameObject.SetActive(hasPreset);
+                _deckPresetIds[i] = hasPreset ? presets[i].id : string.Empty;
 
                 if (!hasPreset)
                 {
                     continue;
                 }
 
-                _deckCardTitleTexts[i].text = TruncateWithAsciiEllipsis(presets[i].displayName, 12);
-                _deckCardCostTexts[i].text = $"[{Mathf.Max(0, presets[i].cardIds?.Count ?? 0)}]{GetElementLabel(presets[i].primaryElement)}";
-                _deckCardDescriptionTexts[i].text = TruncateWithAsciiEllipsis(presets[i].description, 46);
-                _deckCardBackgrounds[i].color = GetElementColor(presets[i].primaryElement);
-                _deckCardOutlines[i].enabled = false;
+                _deckPresetTitleTexts[i].text = TruncateWithAsciiEllipsis(presets[i].displayName, 16);
+                _deckPresetCostTexts[i].text = $"[{Mathf.Max(0, presets[i].cardIds?.Count ?? 0)}]{GetElementLabel(presets[i].primaryElement)}";
+                _deckPresetDescriptionTexts[i].text = TruncateWithAsciiEllipsis(presets[i].description, 56);
+                _deckPresetBackgrounds[i].color = GetElementColor(presets[i].primaryElement);
+                _deckPresetOutlines[i].enabled = false;
             }
+        }
+
+        private void RefreshDeckEditorDeck(IReadOnlyList<BattleCardData> deckCards, int selectedDeckSlotIndex)
+        {
+            for (var i = 0; i < _deckSlotButtons.Count; i++)
+            {
+                var hasCard = deckCards != null && i < deckCards.Count;
+                _deckSlotButtons[i].gameObject.SetActive(hasCard);
+                if (!hasCard)
+                {
+                    continue;
+                }
+
+                _deckSlotTitleTexts[i].text = $"{i + 1}. {TruncateWithAsciiEllipsis(deckCards[i].cardName, 11)}";
+                _deckSlotCostTexts[i].text = GetCostLabel(deckCards[i]);
+                _deckSlotDescriptionTexts[i].text = TruncateWithAsciiEllipsis(deckCards[i].description, 44);
+                _deckSlotBackgrounds[i].color = GetElementColor(deckCards[i].elementType);
+                _deckSlotOutlines[i].enabled = i == selectedDeckSlotIndex;
+                _deckSlotBackgrounds[i].transform.localScale = i == selectedDeckSlotIndex ? new Vector3(1.03f, 1.03f, 1f) : Vector3.one;
+            }
+        }
+
+        private void RefreshDeckEditorCatalog(IReadOnlyList<BattleCardData> catalogCards, IReadOnlyList<string> editingDeckCardIds, IReadOnlyCollection<int> interactableCatalogIndices)
+        {
+            for (var i = 0; i < _deckCardButtons.Count; i++)
+            {
+                var hasCard = catalogCards != null && i < catalogCards.Count;
+                _deckCardButtons[i].gameObject.SetActive(hasCard);
+                if (!hasCard)
+                {
+                    _deckCardIds[i] = string.Empty;
+                    continue;
+                }
+
+                _deckCardIds[i] = catalogCards[i].id;
+                var copyCount = CountCardCopies(editingDeckCardIds, catalogCards[i].id);
+                _deckCardTitleTexts[i].text = TruncateWithAsciiEllipsis(catalogCards[i].cardName, 18);
+                _deckCardCostTexts[i].text = $"{GetCostLabel(catalogCards[i])} x{copyCount}/2";
+                _deckCardDescriptionTexts[i].text = TruncateWithAsciiEllipsis(catalogCards[i].description, 78);
+                _deckCardBackgrounds[i].color = GetElementColor(catalogCards[i].elementType);
+                _deckCardButtons[i].interactable = ContainsIndex(interactableCatalogIndices, i);
+                _deckCardOutlines[i].enabled = copyCount > 0;
+            }
+        }
+
+        private static int CountCardCopies(IReadOnlyList<string> cardIds, string targetId)
+        {
+            if (cardIds == null || string.IsNullOrWhiteSpace(targetId))
+            {
+                return 0;
+            }
+
+            var count = 0;
+            for (var i = 0; i < cardIds.Count; i++)
+            {
+                if (cardIds[i] == targetId)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private static string FormatCardDescription(BattleCardData card)
