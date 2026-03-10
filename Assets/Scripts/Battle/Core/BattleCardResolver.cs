@@ -152,6 +152,11 @@ namespace AshenPath.Battle
                 PlayerLostHpThisTurn = true;
             }
 
+            public bool HasPendingRevelation()
+            {
+                return _nextCardHasRevelation;
+            }
+
             private static int GetDictionaryValue(Dictionary<ElementType, int> dictionary, ElementType key)
             {
                 return dictionary.TryGetValue(key, out var value) ? value : 0;
@@ -185,6 +190,11 @@ namespace AshenPath.Battle
         public void ResetBattleState()
         {
             _battleElementDamageBonus.Clear();
+        }
+
+        public int GetBattleElementDamageBonus(ElementType elementType)
+        {
+            return _battleElementDamageBonus.TryGetValue(elementType, out var value) ? value : 0;
         }
 
         public void ResolveCard(BattleCardData card, TurnEffectState effectState, int sequenceIndex)
@@ -253,6 +263,15 @@ namespace AshenPath.Battle
                         case BattleCardEffectType.BonusDamageFromBattleElementBonus:
                             currentDamage += GetBattleElementDamageBonus(card.elementType) * Mathf.Max(0, effect.value);
                             break;
+                        case BattleCardEffectType.BonusDamageIfBlessingTriggered:
+                            if (blessingTriggered)
+                            {
+                                currentDamage += Mathf.Max(0, effect.value);
+                            }
+                            break;
+                        case BattleCardEffectType.BonusDamageFromFreezeStack:
+                            currentDamage += _enemyUnit.FreezeStack * Mathf.Max(0, effect.value);
+                            break;
                         case BattleCardEffectType.RepeatAttack:
                             repeatEffects.Add(effect);
                             break;
@@ -264,6 +283,17 @@ namespace AshenPath.Battle
             {
                 case "dark_crow":
                     effectState.AddNextElementDamageMultiplierPercent(ElementType.Dark, 150);
+                    break;
+                case "wind_storm_call":
+                    if (effectState.GetUsedElementCount(ElementType.Wind) >= 3)
+                    {
+                        repeatEffects.Add(new BattleCardEffectData
+                        {
+                            effectType = BattleCardEffectType.RepeatAttack,
+                            value = 6,
+                            secondaryValue = 1
+                        });
+                    }
                     break;
             }
 
@@ -390,6 +420,27 @@ namespace AshenPath.Battle
                                 _battleUI.AddBattleLog($"協約が満たされ、カードを {Mathf.Max(0, effect.value)} 枚引いたぬめ");
                             }
                             break;
+                        case BattleCardEffectType.HealIfBlessingTriggered:
+                            if (blessingTriggered)
+                            {
+                                var blessingHeal = _playerUnit.Heal(effect.value);
+                                _battleUI.AddBattleLog($"{_playerUnit.DisplayName} はHPを {blessingHeal} 回復");
+                            }
+                            break;
+                        case BattleCardEffectType.DrawCardsIfBlessingTriggered:
+                            if (blessingTriggered)
+                            {
+                                _deckRuntime.DrawCardsIntoHand(Mathf.Max(0, effect.value));
+                                _battleUI.AddBattleLog($"祝福が満ち、カードを {Mathf.Max(0, effect.value)} 枚引いたぬめ");
+                            }
+                            break;
+                        case BattleCardEffectType.ConsumeEnemyFreezeStack:
+                            if (effect.value > 0)
+                            {
+                                var consumedFreeze = _enemyUnit.ConsumeFreezeStack();
+                                _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} の凍結 {consumedFreeze} を消費したぬめ");
+                            }
+                            break;
                     }
                 }
             }
@@ -413,6 +464,13 @@ namespace AshenPath.Battle
                 case "wind_step":
                     effectState.TurnWideSpDiscount += 1;
                     _battleUI.AddBattleLog("このターンの手札の消費SPが下がったぬめ");
+                    break;
+                case "neutral_reload":
+                    if (_deckRuntime.DiscardFirstHandCardExcept("neutral_reload"))
+                    {
+                        _battleUI.AddBattleLog("手札を1枚捨てたぬめ");
+                    }
+                    _deckRuntime.DrawCardsIntoHand(2);
                     break;
                 case "wind_feather":
                     if (_deckRuntime.DiscardFirstHandCardExcept("wind_feather"))
@@ -458,8 +516,14 @@ namespace AshenPath.Battle
             {
                 if (blessingTriggered)
                 {
-                    effectState.NextCardDamageBonus += blessAmount;
-                    _battleUI.AddBattleLog($"祝福が満ち、次のカードの威力が {blessAmount} 上がったぬめ");
+                    if (blessAmount > 0)
+                    {
+                        _battleUI.AddBattleLog($"祝福が満ち、このカードの追加効果が発動したぬめ ({blessAmount})");
+                    }
+                    else
+                    {
+                        _battleUI.AddBattleLog("祝福が満ち、このカードの追加効果が発動したぬめ");
+                    }
                 }
             }
 
@@ -468,11 +532,6 @@ namespace AshenPath.Battle
                 _deckRuntime.DrawCardsIntoHand(1);
                 _battleUI.AddBattleLog("追風が吹き、カードを1枚引いたぬめ");
             }
-        }
-
-        private int GetBattleElementDamageBonus(ElementType elementType)
-        {
-            return _battleElementDamageBonus.TryGetValue(elementType, out var value) ? value : 0;
         }
 
         private void AddBattleElementDamageBonus(ElementType elementType, int value)

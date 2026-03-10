@@ -2,7 +2,7 @@
   "cards": [
     {
       "id": "neutral_attack",
-      "cardName": "アタック",
+      "cardName": "攻撃",
       "description": "敵単体に5ダメージを与える。",
       "damage": 5,
       "spCost": 1,
@@ -11,7 +11,7 @@
     },
     {
       "id": "neutral_chain",
-      "cardName": "チェイン",
+      "cardName": "連鎖",
       "description": "敵単体に3ダメージを与える。次に使用するカードのダメージを+3する。",
       "damage": 3,
       "spCost": 1,
@@ -26,7 +26,7 @@
     },
     {
       "id": "neutral_recover",
-      "cardName": "リカバー",
+      "cardName": "練気",
       "description": "SPを1回復する。",
       "keywords": [{ "keywordType": "Exhaust", "value": 0 }],
       "damage": 0,
@@ -36,6 +36,41 @@
         {
           "effectType": "RecoverSp",
           "value": 1,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "neutral_first_aid",
+      "cardName": "応急手当",
+      "description": "自身のHPを4回復する。山札からカードを1枚引く。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "None",
+      "effects": [
+        {
+          "effectType": "Heal",
+          "value": 4,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "DrawCards",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "neutral_heal",
+      "cardName": "治癒",
+      "description": "自身のHPを8回復する。",
+      "damage": 0,
+      "spCost": 2,
+      "elementType": "None",
+      "effects": [
+        {
+          "effectType": "Heal",
+          "value": 8,
           "secondaryValue": 0
         }
       ]
@@ -57,7 +92,7 @@
     },
     {
       "id": "neutral_brave",
-      "cardName": "ブレイブ",
+      "cardName": "鼓舞",
       "description": "次に使用するカード1枚のSPコストを-1する（最小0）。",
       "damage": 0,
       "spCost": 1,
@@ -72,7 +107,7 @@
     },
     {
       "id": "neutral_rush",
-      "cardName": "ラッシュ",
+      "cardName": "連撃",
       "description": "敵単体に3ダメージを2回与える。",
       "damage": 0,
       "spCost": 2,
@@ -102,7 +137,7 @@
     },
     {
       "id": "neutral_smash",
-      "cardName": "スマッシュ",
+      "cardName": "強打",
       "description": "敵単体に12ダメージを与える。",
       "damage": 12,
       "spCost": 3,
@@ -111,7 +146,7 @@
     },
     {
       "id": "neutral_finish",
-      "cardName": "フィニッシュ",
+      "cardName": "決着",
       "description": "敵単体に15ダメージを与える。3枚目のカードならさらに10ダメージを与える。",
       "damage": 15,
       "spCost": 3,
@@ -126,7 +161,7 @@
     },
     {
       "id": "neutral_slash",
-      "cardName": "スラッシュ",
+      "cardName": "斬撃",
       "description": "敵単体に8ダメージを与える。",
       "damage": 8,
       "spCost": 2,
@@ -134,11 +169,50 @@
       "effects": []
     },
     {
+      "id": "neutral_reload",
+      "cardName": "再装填",
+      "description": "自身の手札を1枚捨てる。山札からカードを2枚引く。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "None",
+      "effects": []
+    },
+    {
+      "id": "neutral_meditate",
+      "cardName": "瞑想",
+      "description": "自身のHPを3回復し、SPを1回復する。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "None",
+      "effects": [
+        {
+          "effectType": "Heal",
+          "value": 3,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "RecoverSp",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
       "id": "fire_heat",
       "cardName": "ヒート",
       "description": "敵単体に4ダメージを与える。以後の炎カードのダメージを+1する。",
       "keywords": [{ "keywordType": "Kindle", "value": 1 }],
       "damage": 4,
+      "spCost": 1,
+      "elementType": "Fire",
+      "effects": []
+    },
+    {
+      "id": "fire_ember",
+      "cardName": "残火",
+      "description": "敵単体に2ダメージを与える。以後の炎カードのダメージを+2する。",
+      "keywords": [{ "keywordType": "Kindle", "value": 2 }],
+      "damage": 2,
       "spCost": 1,
       "elementType": "Fire",
       "effects": []
@@ -262,8 +336,8 @@
     {
       "id": "ice_cold_mist",
       "cardName": "コールドミスト",
-      "description": "敵に凍結を2付与する。",
-      "keywords": [{ "keywordType": "Freeze", "value": 2 }],
+      "description": "敵に凍結を3付与する。",
+      "keywords": [{ "keywordType": "Freeze", "value": 3 }],
       "damage": 0,
       "spCost": 1,
       "elementType": "Ice",
@@ -272,15 +346,15 @@
     {
       "id": "ice_ice_edge",
       "cardName": "アイスエッジ",
-      "description": "敵単体に6ダメージを与える。敵に凍結を1付与し、次の攻撃を2下げる。",
-      "keywords": [{ "keywordType": "Freeze", "value": 1 }],
+      "description": "敵単体に6ダメージを与える。敵に凍結を2付与し、次の攻撃を3下げる。",
+      "keywords": [{ "keywordType": "Freeze", "value": 2 }],
       "damage": 6,
       "spCost": 1,
       "elementType": "Ice",
       "effects": [
         {
           "effectType": "EnemyAttackDown",
-          "value": 2,
+          "value": 3,
           "secondaryValue": 0
         }
       ]
@@ -297,8 +371,8 @@
     {
       "id": "ice_freeze",
       "cardName": "フリーズ",
-      "description": "敵単体に4ダメージを与える。敵に凍結を3付与する。",
-      "keywords": [{ "keywordType": "Freeze", "value": 3 }],
+      "description": "敵単体に4ダメージを与える。敵に凍結を4付与する。",
+      "keywords": [{ "keywordType": "Freeze", "value": 4 }],
       "damage": 4,
       "spCost": 2,
       "elementType": "Ice",
@@ -320,10 +394,40 @@
       ]
     },
     {
+      "id": "fire_caldera",
+      "cardName": "火口",
+      "description": "敵単体に16ダメージを与える。熾火1につきさらに4ダメージを与える。",
+      "damage": 16,
+      "spCost": 5,
+      "elementType": "Fire",
+      "effects": [
+        {
+          "effectType": "BonusDamageFromBattleElementBonus",
+          "value": 4,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "fire_backdraft",
+      "cardName": "逆火",
+      "description": "敵単体に8ダメージを与える。熾火1につきさらに2ダメージを与える。",
+      "damage": 8,
+      "spCost": 2,
+      "elementType": "Fire",
+      "effects": [
+        {
+          "effectType": "BonusDamageFromBattleElementBonus",
+          "value": 2,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
       "id": "ice_hush",
-      "cardName": "ハッシュ",
-      "description": "敵に凍結を2付与する。敵の次の攻撃を4下げ、カードを1枚引く。",
-      "keywords": [{ "keywordType": "Freeze", "value": 2 }],
+      "cardName": "静寂",
+      "description": "敵に凍結を3付与する。敵の次の攻撃を4下げ、カードを1枚引く。",
+      "keywords": [{ "keywordType": "Freeze", "value": 3 }],
       "damage": 0,
       "spCost": 2,
       "elementType": "Ice",
@@ -336,6 +440,21 @@
         {
           "effectType": "DrawCards",
           "value": 1,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "ice_frostbite",
+      "cardName": "凍傷",
+      "description": "敵単体に7ダメージを与える。敵の凍結1につきさらに3ダメージを与える。",
+      "damage": 7,
+      "spCost": 2,
+      "elementType": "Ice",
+      "effects": [
+        {
+          "effectType": "BonusDamageFromFreezeStack",
+          "value": 3,
           "secondaryValue": 0
         }
       ]
@@ -372,8 +491,8 @@
     {
       "id": "ice_glacia",
       "cardName": "グレイシャ",
-      "description": "敵単体に15ダメージを与える。敵に凍結を2付与する。",
-      "keywords": [{ "keywordType": "Freeze", "value": 2 }],
+      "description": "敵単体に15ダメージを与える。敵に凍結を3付与する。",
+      "keywords": [{ "keywordType": "Freeze", "value": 3 }],
       "damage": 15,
       "spCost": 4,
       "elementType": "Ice",
@@ -382,8 +501,8 @@
     {
       "id": "ice_avalanche",
       "cardName": "アバランチ",
-      "description": "敵単体に20ダメージを与える。敵に凍結を2付与する。",
-      "keywords": [{ "keywordType": "Freeze", "value": 2 }, { "keywordType": "Exhaust", "value": 0 }],
+      "description": "敵単体に20ダメージを与える。敵に凍結を4付与する。",
+      "keywords": [{ "keywordType": "Freeze", "value": 4 }, { "keywordType": "Exhaust", "value": 0 }],
       "damage": 20,
       "spCost": 5,
       "elementType": "Ice",
@@ -426,6 +545,26 @@
       "spCost": 1,
       "elementType": "Wind",
       "effects": []
+    },
+    {
+      "id": "wind_sway",
+      "cardName": "流転",
+      "description": "次に使用するカード1枚のSPコストを-1する。カードを1枚引く。",
+      "damage": 0,
+      "spCost": 0,
+      "elementType": "Wind",
+      "effects": [
+        {
+          "effectType": "DiscountNextCardSp",
+          "value": 1,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "DrawCards",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "wind_aero",
@@ -495,6 +634,26 @@
       ]
     },
     {
+      "id": "wind_storm_call",
+      "cardName": "暴風招来",
+      "description": "敵単体に6ダメージを3回与える。このターンに使用した【風】カードが3枚以上ならさらに1回与える。",
+      "damage": 0,
+      "spCost": 4,
+      "elementType": "Wind",
+      "effects": [
+        {
+          "effectType": "RepeatAttack",
+          "value": 6,
+          "secondaryValue": 3
+        },
+        {
+          "effectType": "RepeatAttackPerUsedElement",
+          "value": 6,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
       "id": "light_light",
       "cardName": "ライト",
       "description": "敵単体に10ダメージを与える。",
@@ -512,6 +671,22 @@
       "spCost": 1,
       "elementType": "Light",
       "effects": []
+    },
+    {
+      "id": "light_omen",
+      "cardName": "前兆",
+      "description": "啓示を得る。カードを1枚引く。",
+      "keywords": [{ "keywordType": "Revelation", "value": 0 }],
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "Light",
+      "effects": [
+        {
+          "effectType": "DrawCards",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "light_lumina",
@@ -532,22 +707,34 @@
     {
       "id": "light_shine",
       "cardName": "シャイン",
-      "description": "敵単体に8ダメージを与える。【啓示】なら、次に使うカード1枚のダメージを+4する。",
-      "keywords": [{ "keywordType": "Blessing", "value": 4 }],
+      "description": "敵単体に8ダメージを与える。【啓示】ならさらに4ダメージを与える。",
+      "keywords": [{ "keywordType": "Blessing", "value": 0 }],
       "damage": 8,
       "spCost": 2,
       "elementType": "Light",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "BonusDamageIfBlessingTriggered",
+          "value": 4,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "light_ray",
       "cardName": "レイ",
-      "description": "敵単体に12ダメージを与える。【啓示】なら、次に使うカード1枚のダメージを+3する。",
-      "keywords": [{ "keywordType": "Blessing", "value": 3 }],
+      "description": "敵単体に12ダメージを与える。【啓示】ならカードを1枚引く。",
+      "keywords": [{ "keywordType": "Blessing", "value": 0 }],
       "damage": 12,
       "spCost": 2,
       "elementType": "Light",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "DrawCardsIfBlessingTriggered",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "light_heal_light",
@@ -602,24 +789,78 @@
       ]
     },
     {
+      "id": "light_protect",
+      "cardName": "守護",
+      "description": "自身にガード6を付与する。啓示を得る。カードを1枚引く。",
+      "keywords": [{ "keywordType": "Revelation", "value": 0 }],
+      "damage": 0,
+      "spCost": 2,
+      "elementType": "Light",
+      "effects": [
+        {
+          "effectType": "GainBarrier",
+          "value": 6,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "DrawCards",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
       "id": "light_sunlight",
       "cardName": "サンライト",
-      "description": "敵単体に18ダメージを与える。与えたダメージの50%分、自身のHPを回復する。【啓示】なら、次に使うカード1枚のダメージを+6する。",
-      "keywords": [{ "keywordType": "Blessing", "value": 6 }],
+      "description": "敵単体に18ダメージを与える。与えたダメージの50%分、自身のHPを回復する。【啓示】ならさらに6ダメージを与える。",
+      "keywords": [{ "keywordType": "Blessing", "value": 0 }],
       "damage": 18,
       "spCost": 4,
       "elementType": "Light",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "BonusDamageIfBlessingTriggered",
+          "value": 6,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "light_holy",
       "cardName": "ホーリー",
-      "description": "敵単体に20ダメージを与える。【啓示】なら、次に使うカード1枚のダメージを+5する。",
-      "keywords": [{ "keywordType": "Blessing", "value": 5 }],
+      "description": "敵単体に20ダメージを与える。【啓示】ならHPを5回復する。",
+      "keywords": [{ "keywordType": "Blessing", "value": 0 }],
       "damage": 20,
       "spCost": 3,
       "elementType": "Light",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "HealIfBlessingTriggered",
+          "value": 5,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "light_seraph",
+      "cardName": "熾天",
+      "description": "敵単体に14ダメージを与える。【啓示】ならさらに14ダメージを与え、自身のHPを8回復する。",
+      "keywords": [{ "keywordType": "Blessing", "value": 0 }],
+      "damage": 14,
+      "spCost": 4,
+      "elementType": "Light",
+      "effects": [
+        {
+          "effectType": "BonusDamageIfBlessingTriggered",
+          "value": 14,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "HealIfBlessingTriggered",
+          "value": 8,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "light_judge",
@@ -668,6 +909,42 @@
       "spCost": 1,
       "elementType": "Dark",
       "effects": []
+    },
+    {
+      "id": "dark_bloodletter",
+      "cardName": "血印",
+      "description": "自身のHPを3消費する。次に使用する【闇】カードのダメージを+8する。",
+      "damage": 0,
+      "spCost": 0,
+      "elementType": "Dark",
+      "effects": [
+        {
+          "effectType": "SelfDamage",
+          "value": 3,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "BuffNextElementDamage",
+          "value": 8,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "dark_pain_share",
+      "cardName": "痛み分け",
+      "description": "敵単体に8ダメージを与える。【協約】ならさらに8ダメージを与える。",
+      "keywords": [{ "keywordType": "Covenant", "value": 0 }],
+      "damage": 8,
+      "spCost": 2,
+      "elementType": "Dark",
+      "effects": [
+        {
+          "effectType": "BonusDamageIfPlayerLostHpThisTurn",
+          "value": 8,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "dark_dark",
@@ -761,6 +1038,26 @@
         {
           "effectType": "BonusDamageIfPlayerLostHpThisTurn",
           "value": 12,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "ice_icicle_fall",
+      "cardName": "氷柱落とし",
+      "description": "敵単体に10ダメージを与える。敵の凍結1につきさらに5ダメージを与え、その後凍結をすべて失わせる。",
+      "damage": 10,
+      "spCost": 4,
+      "elementType": "Ice",
+      "effects": [
+        {
+          "effectType": "BonusDamageFromFreezeStack",
+          "value": 5,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "ConsumeEnemyFreezeStack",
+          "value": 1,
           "secondaryValue": 0
         }
       ]

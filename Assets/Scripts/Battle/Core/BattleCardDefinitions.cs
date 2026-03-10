@@ -27,7 +27,12 @@ namespace AshenPath.Battle
         DrawCardsIfPlayerLostHpThisTurn,
         DiscardHandDamage,
         RepeatAttackPerUsedElement,
-        BonusDamageFromBattleElementBonus
+        BonusDamageFromBattleElementBonus,
+        BonusDamageIfBlessingTriggered,
+        HealIfBlessingTriggered,
+        DrawCardsIfBlessingTriggered,
+        BonusDamageFromFreezeStack,
+        ConsumeEnemyFreezeStack
     }
 
     public enum BattleCardKeywordType

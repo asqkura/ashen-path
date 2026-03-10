@@ -49,6 +49,24 @@ namespace AshenPath.Battle
             }
         }
 
+        public void ReplaceSelectedDeckByIds(IReadOnlyList<string> cardIds)
+        {
+            _selectedDeck.Clear();
+            if (cardIds == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < cardIds.Count; i++)
+            {
+                var card = FindCardById(cardIds[i]);
+                if (card != null)
+                {
+                    _selectedDeck.Add(card);
+                }
+            }
+        }
+
         public BattleCardData FindCardById(string cardId)
         {
             for (var i = 0; i < _allCards.Count; i++)

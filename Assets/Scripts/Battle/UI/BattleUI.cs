@@ -53,12 +53,14 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _turnText;
         private TextMeshProUGUI _resultText;
         private TextMeshProUGUI _playerNameText;
+        private TextMeshProUGUI _playerStateText;
         private TextMeshProUGUI _playerHpText;
         private Image _playerHpFill;
         private TextMeshProUGUI _playerSpText;
         private Image _playerSpFill;
         private TextMeshProUGUI _enemyNameText;
         private TextMeshProUGUI _enemyIntentText;
+        private TextMeshProUGUI _enemyStateText;
         private TextMeshProUGUI _enemyHpText;
         private Image _enemyHpFill;
         private TextMeshProUGUI _logText;
@@ -70,6 +72,8 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _selectedCardPreviewTitle;
         private TextMeshProUGUI _selectedCardPreviewCost;
         private TextMeshProUGUI _selectedCardPreviewDescription;
+        private GameObject _selectedCardKeywordTooltipRoot;
+        private TextMeshProUGUI _selectedCardKeywordTooltipText;
         private readonly Queue<string> _battleLogs = new();
         private readonly List<BattleCardData> _currentHandCards = new();
         private readonly List<Button> _cardButtons = new();
@@ -154,9 +158,13 @@ namespace AshenPath.Battle
             _enemyIntentText = CreateText("EnemyIntentText", enemyPanel.transform, 20, TextAnchor.MiddleRight, new Color(0.98f, 0.88f, 0.62f, 1f));
             _enemyIntentText.fontStyle = FontStyles.Bold;
             ConfigureRect(_enemyIntentText.rectTransform, new Vector2(-PanelPadding, -PanelPadding - 2f), new Vector2(180f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+            _enemyStateText = CreateText("EnemyStateText", enemyPanel.transform, 18, TextAnchor.MiddleLeft, new Color(0.86f, 0.92f, 0.98f, 1f));
+            ConfigureRect(_enemyStateText.rectTransform, new Vector2(PanelPadding, -56f), new Vector2(220f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
             _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, EnemyAccent, out _enemyHpText);
 
             var playerPanel = CreateStatusPanel("PlayerPanel", _battleContentRoot, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
+            _playerStateText = CreateText("PlayerStateText", playerPanel.transform, 18, TextAnchor.MiddleLeft, new Color(0.86f, 0.92f, 0.98f, 1f));
+            ConfigureRect(_playerStateText.rectTransform, new Vector2(PanelPadding, -56f), new Vector2(220f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
             _playerHpFill = CreateStatusBarSection(playerPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, PlayerAccent, out _playerHpText);
             _playerSpFill = CreateStatusBarSection(playerPanel.transform, "SpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, SpAccent, out _playerSpText);
 
@@ -190,7 +198,7 @@ namespace AshenPath.Battle
             {
                 var deckCardIndex = i;
                 _deckCardButtons[i].onClick.RemoveAllListeners();
-                _deckCardButtons[i].onClick.AddListener(() => controller.ToggleDeckCard(_deckCardIds[deckCardIndex]));
+                _deckCardButtons[i].onClick.AddListener(() => controller.SelectDeckPreset(deckCardIndex));
             }
 
             if (_deckEditorStartButton != null)
@@ -376,6 +384,19 @@ namespace AshenPath.Battle
             }
         }
 
+        public void SetBattleStates(string playerState, string enemyState)
+        {
+            if (_playerStateText != null)
+            {
+                _playerStateText.text = string.IsNullOrWhiteSpace(playerState) ? "状態: なし" : playerState;
+            }
+
+            if (_enemyStateText != null)
+            {
+                _enemyStateText.text = string.IsNullOrWhiteSpace(enemyState) ? "状態: なし" : enemyState;
+            }
+        }
+
         public void SetBattleScreenVisible(bool visible)
         {
             if (_battleContentRoot != null)
@@ -384,7 +405,7 @@ namespace AshenPath.Battle
             }
         }
 
-        public void ShowDeckEditor(IReadOnlyList<BattleCardData> cards, IReadOnlyCollection<string> selectedCardIds, int requiredDeckSize)
+        public void ShowDeckEditor(IReadOnlyList<BattleDeckPresetData> presets, string selectedPresetId, int requiredDeckSize)
         {
             if (_deckEditorPanel == null)
             {
@@ -392,9 +413,9 @@ namespace AshenPath.Battle
             }
 
             _deckEditorPanel.SetActive(true);
-            RefreshDeckEditor(cards);
-            SetDeckEditorHint($"あと {Mathf.Max(0, requiredDeckSize - (selectedCardIds?.Count ?? 0))} 枚必要ぬめ");
-            SetDeckEditorSelection(selectedCardIds, requiredDeckSize);
+            RefreshDeckEditor(presets);
+            SetDeckEditorHint("ぬめの想定デッキから1つ選ぶぬめ");
+            SetDeckEditorSelection(selectedPresetId, requiredDeckSize);
         }
 
         public void HideDeckEditor()
@@ -405,31 +426,25 @@ namespace AshenPath.Battle
             }
         }
 
-        public void SetDeckEditorSelection(IReadOnlyCollection<string> selectedCardIds, int requiredDeckSize)
+        public void SetDeckEditorSelection(string selectedPresetId, int requiredDeckSize)
         {
-            var selectedCount = 0;
             for (var i = 0; i < _deckCardButtons.Count; i++)
             {
-                var isSelected = ContainsCardId(selectedCardIds, _deckCardIds[i]);
-                if (isSelected)
-                {
-                    selectedCount++;
-                }
-
+                var isSelected = !string.IsNullOrWhiteSpace(selectedPresetId) && selectedPresetId == _deckCardIds[i];
                 _deckCardOutlines[i].enabled = isSelected;
                 _deckCardBackgrounds[i].transform.localScale = isSelected ? new Vector3(1.04f, 1.04f, 1f) : Vector3.one;
             }
 
             if (_deckEditorCountText != null)
             {
-                _deckEditorCountText.text = $"DECK {selectedCount} / {requiredDeckSize}";
+                _deckEditorCountText.text = $"DECK {requiredDeckSize} / {requiredDeckSize}";
             }
 
             if (_deckEditorStartButton != null)
             {
-                var canStart = selectedCount == requiredDeckSize;
+                var canStart = !string.IsNullOrWhiteSpace(selectedPresetId);
                 _deckEditorStartButton.interactable = canStart;
-                _deckEditorStartButtonText.text = canStart ? "戦闘開始" : $"戦闘開始 ({selectedCount}/{requiredDeckSize})";
+                _deckEditorStartButtonText.text = canStart ? "戦闘開始" : "デッキ選択";
             }
         }
 
@@ -719,7 +734,15 @@ namespace AshenPath.Battle
             _selectedCardPreviewDescription.overflowMode = TextOverflowModes.Overflow;
             ConfigureRect(_selectedCardPreviewDescription.rectTransform, new Vector2(28f, -156f), new Vector2(304f, 304f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
+            _selectedCardKeywordTooltipRoot = CreatePanel("KeywordTooltipPanel", parent, new Vector2(332f, -24f), new Vector2(300f, 320f), new Vector2(0.5f, 0.5f));
+            _selectedCardKeywordTooltipRoot.GetComponent<Image>().color = new Color(0.1f, 0.11f, 0.14f, 0.96f);
+            _selectedCardKeywordTooltipText = CreateText("KeywordTooltipText", _selectedCardKeywordTooltipRoot.transform, 20, TextAnchor.UpperLeft, TextColor);
+            _selectedCardKeywordTooltipText.textWrappingMode = TextWrappingModes.Normal;
+            _selectedCardKeywordTooltipText.overflowMode = TextOverflowModes.Overflow;
+            ConfigureRect(_selectedCardKeywordTooltipText.rectTransform, new Vector2(18f, -18f), new Vector2(264f, 284f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
             _selectedCardPreviewRoot.SetActive(false);
+            _selectedCardKeywordTooltipRoot.SetActive(false);
         }
 
         private void CreateCardHand(Transform parent)
@@ -800,7 +823,7 @@ namespace AshenPath.Battle
             _deckEditorPanel.GetComponent<Image>().color = new Color(0.07f, 0.08f, 0.1f, 0.97f);
 
             var title = CreateText("DeckEditorTitle", _deckEditorPanel.transform, 42, TextAnchor.MiddleLeft, TextColor);
-            title.text = "DECK EDIT";
+            title.text = "DECK SELECT";
             title.fontStyle = FontStyles.Bold;
             ConfigureRect(title.rectTransform, new Vector2(32f, -28f), new Vector2(280f, 44f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
@@ -831,7 +854,7 @@ namespace AshenPath.Battle
             var totalWidth = columns * cardWidth + (columns - 1) * spacingX;
             var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
 
-            for (var i = 0; i < 72; i++)
+            for (var i = 0; i < 90; i++)
             {
                 var row = i / columns;
                 var column = i % columns;
@@ -877,23 +900,23 @@ namespace AshenPath.Battle
             }
         }
 
-        private void RefreshDeckEditor(IReadOnlyList<BattleCardData> cards)
+        private void RefreshDeckEditor(IReadOnlyList<BattleDeckPresetData> presets)
         {
             for (var i = 0; i < _deckCardButtons.Count; i++)
             {
-                var hasCard = cards != null && i < cards.Count;
-                _deckCardButtons[i].gameObject.SetActive(hasCard);
-                _deckCardIds[i] = hasCard ? cards[i].id : string.Empty;
+                var hasPreset = presets != null && i < presets.Count;
+                _deckCardButtons[i].gameObject.SetActive(hasPreset);
+                _deckCardIds[i] = hasPreset ? presets[i].id : string.Empty;
 
-                if (!hasCard)
+                if (!hasPreset)
                 {
                     continue;
                 }
 
-                _deckCardTitleTexts[i].text = TruncateWithAsciiEllipsis(cards[i].cardName, 12);
-                _deckCardCostTexts[i].text = GetCostLabel(cards[i]);
-                _deckCardDescriptionTexts[i].text = TruncateWithAsciiEllipsis(FormatCardDescription(cards[i]), 46);
-                _deckCardBackgrounds[i].color = GetElementColor(cards[i].elementType);
+                _deckCardTitleTexts[i].text = TruncateWithAsciiEllipsis(presets[i].displayName, 12);
+                _deckCardCostTexts[i].text = $"[{Mathf.Max(0, presets[i].cardIds?.Count ?? 0)}]{GetElementLabel(presets[i].primaryElement)}";
+                _deckCardDescriptionTexts[i].text = TruncateWithAsciiEllipsis(presets[i].description, 46);
+                _deckCardBackgrounds[i].color = GetElementColor(presets[i].primaryElement);
                 _deckCardOutlines[i].enabled = false;
             }
         }
@@ -977,6 +1000,50 @@ namespace AshenPath.Battle
             return $"【{label}】";
         }
 
+        private static string FormatKeywordTooltip(IReadOnlyList<BattleCardKeywordData> keywords)
+        {
+            if (keywords == null || keywords.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var lines = new List<string>(keywords.Count + 1)
+            {
+                "KEYWORDS"
+            };
+
+            for (var i = 0; i < keywords.Count; i++)
+            {
+                if (keywords[i] == null)
+                {
+                    continue;
+                }
+
+                lines.Add(GetKeywordTooltipLine(keywords[i]));
+            }
+
+            return lines.Count > 1 ? string.Join("\n", lines) : string.Empty;
+        }
+
+        private static string GetKeywordTooltipLine(BattleCardKeywordData keyword)
+        {
+            return keyword.keywordType switch
+            {
+                BattleCardKeywordType.Kindle => keyword.value > 0
+                    ? $"・熾火 {keyword.value}\n  このカードの使用後、このバトル中は自分の炎カードのダメージが +{keyword.value} される。"
+                    : "・熾火\n  このカードの使用後、このバトル中は自分の炎カードのダメージが上がる。",
+                BattleCardKeywordType.Freeze => keyword.value > 0
+                    ? $"・凍結 {keyword.value}\n  敵に凍結を {keyword.value} 付与する。凍結が 5 以上になると、次の敵行動をスキップして凍結をリセットする。"
+                    : "・凍結\n  敵に凍結を付与する。凍結が 5 以上になると、次の敵行動をスキップする。",
+                BattleCardKeywordType.Tailwind => "・追風\n  このターン最初の風カードとして使った時、カードを 1 枚引く。",
+                BattleCardKeywordType.Revelation => "・啓示\n  次に使う祝福カードの追加効果を有効にする。",
+                BattleCardKeywordType.Blessing => "・祝福\n  直前のカードで啓示を得ていた場合、このカード自身の追加効果が発動する。",
+                BattleCardKeywordType.Covenant => "・協約\n  このターン中に自分が HP を失っていた場合、このカードの追加効果が発動する。",
+                BattleCardKeywordType.Exhaust => "・消滅\n  使用後、このバトル中はデッキに戻らず除外される。",
+                _ => $"・{keyword.keywordType}"
+            };
+        }
+
         private string GetCostLabel(BattleCardData card)
         {
             if (card == null)
@@ -997,6 +1064,10 @@ namespace AshenPath.Battle
             if (card == null)
             {
                 _selectedCardPreviewRoot.SetActive(false);
+                if (_selectedCardKeywordTooltipRoot != null)
+                {
+                    _selectedCardKeywordTooltipRoot.SetActive(false);
+                }
                 return;
             }
 
@@ -1005,6 +1076,15 @@ namespace AshenPath.Battle
             _selectedCardPreviewTitle.text = card.cardName;
             _selectedCardPreviewCost.text = GetCostLabel(card);
             _selectedCardPreviewDescription.text = FormatCardDescription(card);
+
+            if (_selectedCardKeywordTooltipRoot == null || _selectedCardKeywordTooltipText == null)
+            {
+                return;
+            }
+
+            var tooltip = FormatKeywordTooltip(card.keywords);
+            _selectedCardKeywordTooltipRoot.SetActive(!string.IsNullOrWhiteSpace(tooltip));
+            _selectedCardKeywordTooltipText.text = tooltip;
         }
 
         private void SetHoveredCardIndex(int cardIndex)

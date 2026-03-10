@@ -4,7 +4,7 @@ namespace AshenPath.Battle
 {
     public class BattleUnit
     {
-        private const int DefaultFreezeThreshold = 6;
+        private const int DefaultFreezeThreshold = 5;
 
         public BattleUnit(BattleUnitData data)
         {
@@ -161,6 +161,13 @@ namespace AshenPath.Battle
 
             FreezeStack = 0;
             return true;
+        }
+
+        public int ConsumeFreezeStack()
+        {
+            var value = FreezeStack;
+            FreezeStack = 0;
+            return value;
         }
 
         public void SetWeakElement(ElementType elementType)
