@@ -13,11 +13,6 @@ namespace AshenPath.Battle
         private const int OpeningHandSize = 5;
         private const int TurnDrawCount = 2;
         private const int MaxCardsPerTurn = 3;
-        private const int MaxDeckSwaps = 5;
-        private const int MaxNeutralCards = 4;
-        private const int MaxSupportCards = 3;
-        private const int MinPrimaryCards = 6;
-        private const int MaxCopiesPerCard = 2;
 
         private enum BattleState
         {
@@ -55,14 +50,12 @@ namespace AshenPath.Battle
         private int _cardsPlayedThisTurn;
         private BattleEnemyActionData _nextEnemyAction;
         private readonly BattleDeckRuntime _deckRuntime = new();
+        private readonly BattleDeckEditSession _deckEditSession = new(RequiredDeckSize, 5, 4, 3, 6, 2);
         private readonly List<BattleDeckPresetData> _deckPresets = new();
         private BattleCardResolver _cardResolver;
         private BattleCardResolver.TurnEffectState _turnEffectState;
         private readonly List<int> _selectedCardIndices = new();
-        private readonly List<string> _editingDeckCardIds = new();
-        private readonly List<string> _baseDeckCardIds = new();
         private int _selectedDeckPresetIndex;
-        private int _selectedDeckSlotIndex = -1;
 
         public void Initialize(BattleUI battleUI)
         {
@@ -71,16 +64,7 @@ namespace AshenPath.Battle
 
         public void InitializeBattle(BattleUI battleUI)
         {
-            _battleUI = battleUI;
-            _battleUI.Bind(this);
-            LoadCardCatalog();
-            LoadEnemyCatalog();
-            BuildDeckPresets();
-            _deckRuntime.HandLimit = MaxHandSize;
-            ApplySelectedDeckPreset();
-            _playerUnit = new BattleUnit(playerUnitData);
-            _enemyUnit = new BattleUnit(GetEnemyUnitData());
-            _cardResolver = new BattleCardResolver(_battleUI, _deckRuntime, _playerUnit, _enemyUnit, PerformAttack, RefreshUi);
+            InitializeRuntime(battleUI);
             _battleUI.HideDeckEditor();
             _battleUI.SetBattleScreenVisible(true);
             _battleUI.SetResultText(string.Empty, false);
@@ -90,16 +74,7 @@ namespace AshenPath.Battle
 
         public void InitializeDeckEditor(BattleUI battleUI)
         {
-            _battleUI = battleUI;
-            _battleUI.Bind(this);
-            LoadCardCatalog();
-            LoadEnemyCatalog();
-            BuildDeckPresets();
-            _deckRuntime.HandLimit = MaxHandSize;
-            ApplySelectedDeckPreset();
-            _playerUnit = new BattleUnit(playerUnitData);
-            _enemyUnit = new BattleUnit(GetEnemyUnitData());
-            _cardResolver = new BattleCardResolver(_battleUI, _deckRuntime, _playerUnit, _enemyUnit, PerformAttack, RefreshUi);
+            InitializeRuntime(battleUI);
             _state = BattleState.DeckEditing;
 
             _battleUI.SetBattleScreenVisible(false);
@@ -125,18 +100,18 @@ namespace AshenPath.Battle
 
         public void SelectDeckSlot(int slotIndex)
         {
-            if (_state != BattleState.DeckEditing || slotIndex < 0 || slotIndex >= _editingDeckCardIds.Count)
+            if (_state != BattleState.DeckEditing)
             {
                 return;
             }
 
-            _selectedDeckSlotIndex = slotIndex;
+            _deckEditSession.SelectSlot(slotIndex);
             RefreshDeckEditorUi("下の候補カードを押すと、この枠と差し替えるぬめ");
         }
 
         public void SelectCatalogCard(int cardIndex)
         {
-            if (_state != BattleState.DeckEditing || _selectedDeckSlotIndex < 0 || _selectedDeckSlotIndex >= _editingDeckCardIds.Count)
+            if (_state != BattleState.DeckEditing)
             {
                 return;
             }
@@ -152,7 +127,7 @@ namespace AshenPath.Battle
                 return;
             }
 
-            if (!TryReplaceEditingDeckCard(_selectedDeckSlotIndex, selectedCard.id, out var message))
+            if (!_deckEditSession.TryReplaceCard(selectedCard.id, _deckRuntime, out var message))
             {
                 RefreshDeckEditorUi(message);
                 return;
@@ -163,7 +138,7 @@ namespace AshenPath.Battle
 
         public void ConfirmDeckSelection()
         {
-            if (_state != BattleState.DeckEditing || _deckRuntime.SelectedDeckCount != RequiredDeckSize)
+            if (_state != BattleState.DeckEditing || !_deckEditSession.CanStartBattle())
             {
                 return;
             }
@@ -222,12 +197,11 @@ namespace AshenPath.Battle
             _selectedCardIndices.Clear();
             _turnEffectState = new BattleCardResolver.TurnEffectState();
 
-            _playerUnit.Reset();
-            _enemyUnit.Reset();
+            ResetBattleRuntime();
             _deckRuntime.BeginBattle();
             _cardResolver.ResetBattleState();
             _deckRuntime.DrawCardsIntoHand(OpeningHandSize, MaxHandSize);
-            _nextEnemyAction = RollEnemyAction();
+            _nextEnemyAction = BattleEnemyActionSelector.RollAction(_enemyData, _enemyUnit, enemyUnitData);
 
             _battleUI.SetBattleScreenVisible(true);
             _battleUI.HideDeckEditor();
@@ -256,7 +230,7 @@ namespace AshenPath.Battle
             _battleUI.RefreshHand(_deckRuntime.Hand);
             _battleUI.SetTurnText(turnMessage);
             _battleUI.SetTurnCount(_turnCount);
-            _battleUI.SetEnemyIntent(GetEnemyIntentLabel(_nextEnemyAction));
+            _battleUI.SetEnemyIntent(BattleEnemyActionSelector.GetIntentLabel(_nextEnemyAction, _enemyUnit));
             RefreshUi();
             UpdateCardState();
 
@@ -274,7 +248,7 @@ namespace AshenPath.Battle
 
             _state = BattleState.EnemyTurn;
             _battleUI.SetTurnText("敵のターンです");
-            _battleUI.AddBattleLog($"敵のターン: {GetEnemyIntentLabel(_nextEnemyAction)}");
+            _battleUI.AddBattleLog($"敵のターン: {BattleEnemyActionSelector.GetIntentLabel(_nextEnemyAction, _enemyUnit)}");
             UpdateCardState();
             _enemyTurnCoroutine = StartCoroutine(ExecuteEnemyTurn());
         }
@@ -361,7 +335,7 @@ namespace AshenPath.Battle
                 yield break;
             }
 
-            _nextEnemyAction = RollEnemyAction();
+            _nextEnemyAction = BattleEnemyActionSelector.RollAction(_enemyData, _enemyUnit, enemyUnitData);
             StartPlayerTurn("プレイヤーのターンです");
         }
 
@@ -475,8 +449,10 @@ namespace AshenPath.Battle
         {
             _battleUI.RefreshUnits(_playerUnit, _enemyUnit);
             _battleUI.RefreshPlayerSp(_playerUnit.CurrentSp, _playerUnit.MaxSp);
-            _battleUI.SetEnemyIntent(_state == BattleState.BattleEnded ? string.Empty : GetEnemyIntentLabel(_nextEnemyAction));
-            _battleUI.SetBattleStates(GetPlayerStateLabel(), GetEnemyStateLabel());
+            _battleUI.SetEnemyIntent(_state == BattleState.BattleEnded ? string.Empty : BattleEnemyActionSelector.GetIntentLabel(_nextEnemyAction, _enemyUnit));
+            _battleUI.SetBattleStates(
+                BattleStateLabelFormatter.GetPlayerStateLabel(_cardResolver, _turnEffectState),
+                BattleStateLabelFormatter.GetEnemyStateLabel(_enemyUnit));
         }
 
         private void UpdateCardState()
@@ -510,61 +486,6 @@ namespace AshenPath.Battle
             }
 
             return playable;
-        }
-
-        private BattleEnemyActionData RollEnemyAction()
-        {
-            var actions = _enemyData?.actions;
-            if (actions == null || actions.Count == 0)
-            {
-                return CreateFallbackEnemyAction();
-            }
-
-            var totalWeight = 0;
-            for (var i = 0; i < actions.Count; i++)
-            {
-                totalWeight += GetEnemyActionWeight(actions[i]);
-            }
-
-            if (totalWeight <= 0)
-            {
-                return CreateFallbackEnemyAction();
-            }
-
-            var roll = Random.Range(0, totalWeight);
-            for (var i = 0; i < actions.Count; i++)
-            {
-                var weight = GetEnemyActionWeight(actions[i]);
-                if (roll < weight)
-                {
-                    return actions[i];
-                }
-
-                roll -= weight;
-            }
-
-            return actions[actions.Count - 1];
-        }
-
-        private string GetEnemyIntentLabel(BattleEnemyActionData action)
-        {
-            if (_enemyUnit != null && _enemyUnit.WillSkipNextAction)
-            {
-                return $"予告: 凍結停止 ({_enemyUnit.FreezeStack}/{_enemyUnit.FreezeThreshold})";
-            }
-
-            var baseLabel = action == null
-                ? string.Empty
-                : string.IsNullOrWhiteSpace(action.intentLabel)
-                    ? GetFallbackIntentLabel(action)
-                    : action.intentLabel;
-
-            if (_enemyUnit != null && _enemyUnit.FreezeStack > 0)
-            {
-                return $"{baseLabel} / 凍結 {_enemyUnit.FreezeStack}";
-            }
-
-            return baseLabel;
         }
 
         private void FinalizePlayedCard(BattleCardData card)
@@ -651,66 +572,28 @@ namespace AshenPath.Battle
             _deckRuntime.RemoveCardFromBattleDeck(card);
         }
 
+        private void InitializeRuntime(BattleUI battleUI)
+        {
+            _battleUI = battleUI;
+            _battleUI.Bind(this);
+            LoadCardCatalog();
+            LoadEnemyCatalog();
+            BuildDeckPresets();
+            _deckRuntime.HandLimit = MaxHandSize;
+            ApplySelectedDeckPreset();
+            ResetBattleRuntime();
+            _cardResolver = new BattleCardResolver(_battleUI, _deckRuntime, _playerUnit, _enemyUnit, PerformAttack, RefreshUi);
+        }
+
+        private void ResetBattleRuntime()
+        {
+            _playerUnit = new BattleUnit(playerUnitData);
+            _enemyUnit = new BattleUnit(GetEnemyUnitData());
+        }
+
         private BattleUnitData GetEnemyUnitData()
         {
             return _enemyData?.unitData ?? enemyUnitData;
-        }
-
-        private int GetEnemyActionWeight(BattleEnemyActionData action)
-        {
-            if (action == null)
-            {
-                return 0;
-            }
-
-            var weight = Mathf.Max(0, action.baseWeight);
-            if (_enemyUnit != null && _enemyUnit.MaxHp > 0 && _enemyUnit.CurrentHp <= Mathf.RoundToInt(_enemyUnit.MaxHp * 0.4f))
-            {
-                weight += Mathf.Max(0, action.lowHpBonusWeight);
-            }
-
-            if (_enemyUnit != null && _enemyUnit.PendingAttackMultiplierPercent > 100)
-            {
-                weight += Mathf.Max(0, action.chargedBonusWeight);
-            }
-
-            return weight;
-        }
-
-        private static string GetFallbackIntentLabel(BattleEnemyActionData action)
-        {
-            if (action == null)
-            {
-                return string.Empty;
-            }
-
-            return action.actionType switch
-            {
-                BattleEnemyActionType.Attack => $"予告: 通常攻撃 {Mathf.Max(0, action.attackPower)}",
-                BattleEnemyActionType.HeavyAttack => $"予告: 強攻撃 {Mathf.Max(0, action.attackPower)}",
-                BattleEnemyActionType.Guard => $"予告: 防御 {Mathf.Max(0, action.barrierGain)}",
-                BattleEnemyActionType.Flurry => $"予告: 連撃 {Mathf.Max(0, action.attackPower)}x{Mathf.Max(1, action.hitCount)}",
-                BattleEnemyActionType.Focus => $"予告: 溜め / 次攻撃{x(action.nextAttackMultiplierPercent)} + ガード{Mathf.Max(0, action.barrierGain)}",
-                _ => string.Empty
-            };
-        }
-
-        private static string x(int percent)
-        {
-            return $"{Mathf.Max(100, percent)}%";
-        }
-
-        private BattleEnemyActionData CreateFallbackEnemyAction()
-        {
-            return new BattleEnemyActionData
-            {
-                actionType = BattleEnemyActionType.Attack,
-                intentLabel = $"予告: 通常攻撃 {Mathf.Max(0, GetEnemyUnitData().attackPower)}",
-                attackName = "Claw",
-                attackPower = Mathf.Max(0, GetEnemyUnitData().attackPower),
-                baseWeight = 1,
-                hitCount = 1
-            };
         }
 
         private BattleEnemyData CreateFallbackEnemyData()
@@ -751,43 +634,6 @@ namespace AshenPath.Battle
             return false;
         }
 
-        private string GetPlayerStateLabel()
-        {
-            var parts = new List<string>();
-
-            if (_cardResolver != null)
-            {
-                var kindle = _cardResolver.GetBattleElementDamageBonus(ElementType.Fire);
-                if (kindle > 0)
-                {
-                    parts.Add($"熾火 {kindle}");
-                }
-            }
-
-            if (_turnEffectState != null && _turnEffectState.HasPendingRevelation())
-            {
-                parts.Add("啓示");
-            }
-
-            if (_turnEffectState != null && _turnEffectState.PlayerLostHpThisTurn)
-            {
-                parts.Add("協約");
-            }
-
-            return parts.Count > 0 ? $"状態: {string.Join(" / ", parts)}" : string.Empty;
-        }
-
-        private string GetEnemyStateLabel()
-        {
-            var parts = new List<string>();
-            if (_enemyUnit != null && _enemyUnit.FreezeStack > 0)
-            {
-                parts.Add($"凍結 {_enemyUnit.FreezeStack}/{_enemyUnit.FreezeThreshold}");
-            }
-
-            return parts.Count > 0 ? $"状態: {string.Join(" / ", parts)}" : string.Empty;
-        }
-
         private void ApplySelectedDeckPreset()
         {
             if (_deckPresets.Count == 0)
@@ -796,18 +642,8 @@ namespace AshenPath.Battle
                 return;
             }
 
-            _baseDeckCardIds.Clear();
-            _editingDeckCardIds.Clear();
-
-            var presetCardIds = _deckPresets[_selectedDeckPresetIndex].cardIds;
-            for (var i = 0; i < presetCardIds.Count; i++)
-            {
-                _baseDeckCardIds.Add(presetCardIds[i]);
-                _editingDeckCardIds.Add(presetCardIds[i]);
-            }
-
-            _selectedDeckSlotIndex = _editingDeckCardIds.Count > 0 ? 0 : -1;
-            _deckRuntime.ReplaceSelectedDeckByIds(_editingDeckCardIds);
+            _deckEditSession.ApplyPreset(_deckPresets[_selectedDeckPresetIndex]);
+            _deckRuntime.ReplaceSelectedDeckByIds(_deckEditSession.EditingDeckCardIds);
         }
 
         private string GetSelectedDeckPresetId()
@@ -830,247 +666,14 @@ namespace AshenPath.Battle
             _battleUI.ShowDeckEditor(
                 _deckPresets,
                 GetSelectedDeckPresetId(),
-                GetEditingDeckCards(),
-                _editingDeckCardIds,
-                _selectedDeckSlotIndex,
+                _deckEditSession.GetEditingDeckCards(_deckRuntime),
+                _deckEditSession.EditingDeckCardIds,
+                _deckEditSession.SelectedSlotIndex,
                 _deckRuntime.AllCards,
-                GetCatalogInteractableIndices(),
-                GetDeckSummaryText());
+                _deckEditSession.GetCatalogInteractableIndices(_deckRuntime),
+                _deckEditSession.BuildSummary(_deckRuntime));
             _battleUI.SetDeckEditorHint(hintMessage);
-            _battleUI.SetDeckEditorSelection(GetSelectedDeckPresetId(), RequiredDeckSize, GetRemainingSwapCount(), CanStartBattleFromEditor());
-        }
-
-        private List<BattleCardData> GetEditingDeckCards()
-        {
-            var cards = new List<BattleCardData>(_editingDeckCardIds.Count);
-            for (var i = 0; i < _editingDeckCardIds.Count; i++)
-            {
-                var card = _deckRuntime.FindCardById(_editingDeckCardIds[i]);
-                if (card != null)
-                {
-                    cards.Add(card);
-                }
-            }
-
-            return cards;
-        }
-
-        private List<int> GetCatalogInteractableIndices()
-        {
-            var indices = new List<int>();
-            for (var i = 0; i < _deckRuntime.AllCards.Count; i++)
-            {
-                var card = _deckRuntime.AllCards[i];
-                if (card == null)
-                {
-                    continue;
-                }
-
-                if (_selectedDeckSlotIndex < 0 || CanReplaceEditingDeckCard(_selectedDeckSlotIndex, card.id))
-                {
-                    indices.Add(i);
-                }
-            }
-
-            return indices;
-        }
-
-        private bool TryReplaceEditingDeckCard(int slotIndex, string cardId, out string message)
-        {
-            message = string.Empty;
-            if (!CanReplaceEditingDeckCard(slotIndex, cardId, out message))
-            {
-                return false;
-            }
-
-            _editingDeckCardIds[slotIndex] = cardId;
-            _deckRuntime.ReplaceSelectedDeckByIds(_editingDeckCardIds);
-            return true;
-        }
-
-        private bool CanReplaceEditingDeckCard(int slotIndex, string cardId)
-        {
-            return CanReplaceEditingDeckCard(slotIndex, cardId, out _);
-        }
-
-        private bool CanReplaceEditingDeckCard(int slotIndex, string cardId, out string message)
-        {
-            message = string.Empty;
-            if (slotIndex < 0 || slotIndex >= _editingDeckCardIds.Count)
-            {
-                message = "差し替える枠を先に選ぶぬめ";
-                return false;
-            }
-
-            var primaryElement = _deckPresets[_selectedDeckPresetIndex].primaryElement;
-            var candidateDeck = new List<string>(_editingDeckCardIds);
-            candidateDeck[slotIndex] = cardId;
-
-            if (CountCopies(candidateDeck, cardId) > MaxCopiesPerCard)
-            {
-                message = "同じカードは2枚までぬめ";
-                return false;
-            }
-
-            var neutralCount = 0;
-            var primaryCount = 0;
-            var supportCount = 0;
-            for (var i = 0; i < candidateDeck.Count; i++)
-            {
-                var card = _deckRuntime.FindCardById(candidateDeck[i]);
-                if (card == null)
-                {
-                    continue;
-                }
-
-                if (card.elementType == ElementType.None)
-                {
-                    neutralCount++;
-                }
-                else if (card.elementType == primaryElement)
-                {
-                    primaryCount++;
-                }
-                else
-                {
-                    supportCount++;
-                }
-            }
-
-            if (neutralCount > MaxNeutralCards)
-            {
-                message = "無属性は4枚までぬめ";
-                return false;
-            }
-
-            if (supportCount > MaxSupportCards)
-            {
-                message = "補助属性は3枚までぬめ";
-                return false;
-            }
-
-            if (primaryElement != ElementType.None && primaryCount < MinPrimaryCards)
-            {
-                message = "主属性カードは6枚以上ほしいぬめ";
-                return false;
-            }
-
-            if (GetSwapCount(candidateDeck) > MaxDeckSwaps)
-            {
-                message = "差し替えは5枚までぬめ";
-                return false;
-            }
-
-            return true;
-        }
-
-        private int GetRemainingSwapCount()
-        {
-            return Mathf.Max(0, MaxDeckSwaps - GetSwapCount(_editingDeckCardIds));
-        }
-
-        private int GetSwapCount(List<string> deckCardIds)
-        {
-            var swapCount = 0;
-            var count = Mathf.Min(deckCardIds.Count, _baseDeckCardIds.Count);
-            for (var i = 0; i < count; i++)
-            {
-                if (deckCardIds[i] != _baseDeckCardIds[i])
-                {
-                    swapCount++;
-                }
-            }
-
-            return swapCount;
-        }
-
-        private bool CanStartBattleFromEditor()
-        {
-            if (_editingDeckCardIds.Count != RequiredDeckSize)
-            {
-                return false;
-            }
-
-            return GetRemainingSwapCount() >= 0;
-        }
-
-        private string GetDeckSummaryText()
-        {
-            var primaryElement = _deckPresets.Count > 0 ? _deckPresets[_selectedDeckPresetIndex].primaryElement : ElementType.None;
-            var primaryCount = 0;
-            var neutralCount = 0;
-            var supportCount = 0;
-            var totalSp = 0;
-            var defenseCount = 0;
-            var finisherCount = 0;
-
-            for (var i = 0; i < _editingDeckCardIds.Count; i++)
-            {
-                var card = _deckRuntime.FindCardById(_editingDeckCardIds[i]);
-                if (card == null)
-                {
-                    continue;
-                }
-
-                totalSp += card.spCost;
-                if (card.elementType == ElementType.None)
-                {
-                    neutralCount++;
-                }
-                else if (card.elementType == primaryElement)
-                {
-                    primaryCount++;
-                }
-                else
-                {
-                    supportCount++;
-                }
-
-                if (card.damage >= 18)
-                {
-                    finisherCount++;
-                }
-
-                if (card.damage == 0 || CardHasEffect(card, BattleCardEffectType.Heal) || CardHasEffect(card, BattleCardEffectType.GainBarrier))
-                {
-                    defenseCount++;
-                }
-            }
-
-            var averageSp = _editingDeckCardIds.Count > 0 ? totalSp / (float)_editingDeckCardIds.Count : 0f;
-            return $"主属性 {primaryCount}/{MinPrimaryCards}  無 {neutralCount}/{MaxNeutralCards}  補助 {supportCount}/{MaxSupportCards}  差し替え {GetSwapCount(_editingDeckCardIds)}/{MaxDeckSwaps}\n平均SP {averageSp:0.0}  守り {defenseCount}  締め {finisherCount}";
-        }
-
-        private static int CountCopies(List<string> deckCardIds, string cardId)
-        {
-            var count = 0;
-            for (var i = 0; i < deckCardIds.Count; i++)
-            {
-                if (deckCardIds[i] == cardId)
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private static bool CardHasEffect(BattleCardData card, BattleCardEffectType effectType)
-        {
-            if (card?.effects == null)
-            {
-                return false;
-            }
-
-            for (var i = 0; i < card.effects.Count; i++)
-            {
-                if (card.effects[i] != null && card.effects[i].effectType == effectType)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            _battleUI.SetDeckEditorSelection(GetSelectedDeckPresetId(), RequiredDeckSize, _deckEditSession.GetRemainingSwapCount(), _deckEditSession.CanStartBattle());
         }
 
         private static BattleDeckPresetData CreateDeckPreset(string id, string displayName, string description, ElementType primaryElement, params string[] cardIds)
