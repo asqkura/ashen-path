@@ -17,6 +17,7 @@ namespace AshenPath.Battle
         private bool _isPointerInside;
         private bool _isSelected;
         private Action _pointerEnterAction;
+        private Action _pointerExitAction;
         private float _targetHoverOffsetY;
         private float _currentHoverOffsetY;
 
@@ -61,6 +62,7 @@ namespace AshenPath.Battle
             _isPointerInside = false;
             _targetRotation = Quaternion.identity;
             _targetHoverOffsetY = 0f;
+            _pointerExitAction?.Invoke();
         }
 
         private void OnDisable()
@@ -79,6 +81,11 @@ namespace AshenPath.Battle
         public void BindPointerEnterAction(Action pointerEnterAction)
         {
             _pointerEnterAction = pointerEnterAction;
+        }
+
+        public void BindPointerExitAction(Action pointerExitAction)
+        {
+            _pointerExitAction = pointerExitAction;
         }
 
         public void BindVisualTarget(RectTransform visualTarget)

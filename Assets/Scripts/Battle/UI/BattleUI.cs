@@ -14,7 +14,7 @@ namespace AshenPath.Battle
         private static readonly Vector2 PlayerPanelSize = new(440f, 182f);
         private static readonly Vector2 StatusBarSize = new(392f, 52f);
         private static readonly Vector2 ArenaSize = new(1360f, 500f);
-        private static readonly Vector2 HandRootSize = new(1520f, 220f);
+        private static readonly Vector2 HandRootSize = new(1600f, 260f);
         private static readonly Vector2 LogPanelSize = new(520f, 160f);
         private static readonly Vector2 ConfirmButtonSize = new(220f, 68f);
         private const int DisplayedHandCardCount = 8;
@@ -68,7 +68,13 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _turnCountText;
         private Button _confirmButton;
         private TextMeshProUGUI _confirmButtonText;
+        private GameObject _selectedCardPreviewRoot;
+        private Image _selectedCardPreviewBackground;
+        private TextMeshProUGUI _selectedCardPreviewTitle;
+        private TextMeshProUGUI _selectedCardPreviewCost;
+        private TextMeshProUGUI _selectedCardPreviewDescription;
         private readonly Queue<string> _battleLogs = new();
+        private readonly List<BattleCardData> _currentHandCards = new();
         private readonly List<Button> _cardButtons = new();
         private readonly List<RectTransform> _cardRects = new();
         private readonly List<Vector2> _cardAnchoredPositions = new();
@@ -107,6 +113,7 @@ namespace AshenPath.Battle
         private float _playerSpTargetFill = 1f;
         private float _enemyHpTargetFill = 1f;
         private float _enemyShieldTargetFill = 1f;
+        private int _hoveredCardIndex = -1;
 
         public void Build()
         {
@@ -160,6 +167,7 @@ namespace AshenPath.Battle
             _resultText.gameObject.SetActive(false);
 
             CreateBattleLog(_battleContentRoot);
+            CreateSelectedCardPreview(_battleContentRoot);
             CreateCardHand(_battleContentRoot);
             CreateConfirmButton(_battleContentRoot);
             CreateDeckEditor(canvasObject.transform);
@@ -295,6 +303,15 @@ namespace AshenPath.Battle
 
         public void RefreshHand(IReadOnlyList<BattleCardData> hand)
         {
+            _currentHandCards.Clear();
+            if (hand != null)
+            {
+                for (var i = 0; i < hand.Count; i++)
+                {
+                    _currentHandCards.Add(hand[i]);
+                }
+            }
+
             for (var i = 0; i < _cardButtons.Count; i++)
             {
                 var hasCard = hand != null && i < hand.Count;
@@ -305,11 +322,13 @@ namespace AshenPath.Battle
                     continue;
                 }
 
-                _cardTitleTexts[i].text = hand[i].cardName;
-                _cardDescriptionTexts[i].text = FormatCardDescription(hand[i]);
-                _cardCostTexts[i].text = $"[{hand[i].spCost}]{GetElementLabel(hand[i].elementType)}";
+                _cardTitleTexts[i].text = TruncateWithAsciiEllipsis(hand[i].cardName, 10);
+                _cardDescriptionTexts[i].text = TruncateWithAsciiEllipsis(FormatCardDescription(hand[i]), 38);
+                _cardCostTexts[i].text = GetCostLabel(hand[i]);
                 _cardElementTexts[i].text = string.Empty;
             }
+
+            RefreshHoveredCardPreview();
         }
 
         public void SetCardsInteractable(bool interactable, IReadOnlyList<BattleCardData> hand, int currentSp, IReadOnlyCollection<int> selectedIndices)
@@ -628,7 +647,7 @@ namespace AshenPath.Battle
 
             _turnText = CreateText("TurnText", logPanel.transform, 18, TextAnchor.MiddleLeft, new Color(0.9f, 0.92f, 0.96f, 1f));
             _turnText.textWrappingMode = TextWrappingModes.Normal;
-            _turnText.overflowMode = TextOverflowModes.Ellipsis;
+            _turnText.overflowMode = TextOverflowModes.Truncate;
             ConfigureRect(_turnText.rectTransform, new Vector2(20f, -48f), new Vector2(LogPanelSize.x - 200f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
             _logText = CreateText("BattleLogText", logPanel.transform, 20, TextAnchor.UpperLeft, TextColor);
@@ -637,15 +656,53 @@ namespace AshenPath.Battle
             ConfigureRect(_logText.rectTransform, new Vector2(20f, -78f), new Vector2(LogPanelSize.x - 40f, LogPanelSize.y - 98f), new Vector2(0f, 1f), new Vector2(0f, 1f));
         }
 
+        private void CreateSelectedCardPreview(Transform parent)
+        {
+            _selectedCardPreviewRoot = new GameObject("SelectedCardPreview", typeof(Image), typeof(Outline));
+            _selectedCardPreviewRoot.transform.SetParent(parent, false);
+            _selectedCardPreviewBackground = _selectedCardPreviewRoot.GetComponent<Image>();
+            _selectedCardPreviewBackground.color = CardColor;
+            _selectedCardPreviewBackground.sprite = GetRoundedPanelSprite();
+            _selectedCardPreviewBackground.type = Image.Type.Sliced;
+            _selectedCardPreviewBackground.raycastTarget = false;
+            ConfigureRect(_selectedCardPreviewBackground.rectTransform, new Vector2(0f, -10f), new Vector2(360f, 500f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            var outline = _selectedCardPreviewRoot.GetComponent<Outline>();
+            outline.effectColor = new Color(0.26f, 0.19f, 0.1f, 0.95f);
+            outline.effectDistance = new Vector2(5f, -5f);
+            outline.useGraphicAlpha = true;
+
+            _selectedCardPreviewTitle = CreateText("PreviewTitle", _selectedCardPreviewRoot.transform, 40, TextAnchor.UpperLeft, DarkTextColor);
+            _selectedCardPreviewTitle.fontStyle = FontStyles.Bold;
+            _selectedCardPreviewTitle.textWrappingMode = TextWrappingModes.Normal;
+            _selectedCardPreviewTitle.overflowMode = TextOverflowModes.Overflow;
+            ConfigureRect(_selectedCardPreviewTitle.rectTransform, new Vector2(28f, -24f), new Vector2(304f, 88f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            var previewBand = CreateRoundedImage("PreviewMetaBand", _selectedCardPreviewRoot.transform, new Color(1f, 1f, 1f, 0.34f));
+            previewBand.raycastTarget = false;
+            ConfigureRect(previewBand.rectTransform, new Vector2(28f, -100f), new Vector2(304f, 40f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            _selectedCardPreviewCost = CreateText("PreviewCost", _selectedCardPreviewRoot.transform, 28, TextAnchor.UpperLeft, DarkTextColor);
+            _selectedCardPreviewCost.fontStyle = FontStyles.Bold;
+            ConfigureRect(_selectedCardPreviewCost.rectTransform, new Vector2(42f, -104f), new Vector2(280f, 32f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            _selectedCardPreviewDescription = CreateText("PreviewDescription", _selectedCardPreviewRoot.transform, 26, TextAnchor.UpperLeft, DarkTextColor);
+            _selectedCardPreviewDescription.textWrappingMode = TextWrappingModes.Normal;
+            _selectedCardPreviewDescription.overflowMode = TextOverflowModes.Overflow;
+            ConfigureRect(_selectedCardPreviewDescription.rectTransform, new Vector2(28f, -156f), new Vector2(304f, 304f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            _selectedCardPreviewRoot.SetActive(false);
+        }
+
         private void CreateCardHand(Transform parent)
         {
             var handRoot = new GameObject("CardHand", typeof(RectTransform));
             handRoot.transform.SetParent(parent, false);
-            ConfigureRect(handRoot.GetComponent<RectTransform>(), new Vector2(0f, 30f), HandRootSize, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
+            ConfigureRect(handRoot.GetComponent<RectTransform>(), new Vector2(0f, 24f), HandRootSize, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
 
-            const float cardWidth = 160f;
+            const float cardWidth = 176f;
             var cardHeight = cardWidth * CardAspectRatio;
-            const float spacing = 12f;
+            const float spacing = 8f;
             var totalWidth = (cardWidth * DisplayedHandCardCount) + (spacing * (DisplayedHandCardCount - 1f));
             var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
 
@@ -678,13 +735,17 @@ namespace AshenPath.Battle
                 ConfigureRect(elementText.rectTransform, new Vector2(-18f, -18f), new Vector2(72f, 24f), new Vector2(1f, 1f), new Vector2(1f, 1f));
                 _cardElementTexts.Add(elementText);
 
+                var metaBand = CreateRoundedImage("MetaBand", visual.transform, new Color(1f, 1f, 1f, 0.34f));
+                metaBand.raycastTarget = false;
+                ConfigureRect(metaBand.rectTransform, new Vector2(18f, -52f), new Vector2(cardWidth - 36f, 32f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
                 var cost = CreateText("Cost", visual.transform, 20, TextAnchor.UpperLeft, DarkTextColor);
-                ConfigureRect(cost.rectTransform, new Vector2(18f, -52f), new Vector2(cardWidth - 36f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(cost.rectTransform, new Vector2(28f, -54f), new Vector2(cardWidth - 56f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
                 cost.fontStyle = FontStyles.Bold;
                 _cardCostTexts.Add(cost);
 
-                var description = CreateText("Description", visual.transform, 22, TextAnchor.UpperLeft, DarkTextColor);
-                ConfigureRect(description.rectTransform, new Vector2(18f, -92f), new Vector2(cardWidth - 36f, 102f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                var description = CreateText("Description", visual.transform, 20, TextAnchor.UpperLeft, DarkTextColor);
+                ConfigureRect(description.rectTransform, new Vector2(18f, -96f), new Vector2(cardWidth - 36f, 122f), new Vector2(0f, 1f), new Vector2(0f, 1f));
                 description.textWrappingMode = TextWrappingModes.Normal;
                 description.overflowMode = TextOverflowModes.Truncate;
                 _cardDescriptionTexts.Add(description);
@@ -692,7 +753,13 @@ namespace AshenPath.Battle
                 var parallaxEffect = button.GetComponent<CardParallaxEffect>();
                 if (parallaxEffect != null)
                 {
-                    parallaxEffect.BindPointerEnterAction(PlayCursorHoverSe);
+                    var cardIndex = i;
+                    parallaxEffect.BindPointerEnterAction(() =>
+                    {
+                        PlayCursorHoverSe();
+                        SetHoveredCardIndex(cardIndex);
+                    });
+                    parallaxEffect.BindPointerExitAction(() => ClearHoveredCardIndex(cardIndex));
                     parallaxEffect.BindVisualTarget(visual.rectTransform);
                 }
             }
@@ -758,9 +825,13 @@ namespace AshenPath.Battle
                 titleText.overflowMode = TextOverflowModes.Truncate;
                 ConfigureRect(titleText.rectTransform, new Vector2(10f, -8f), new Vector2(cardWidth - 20f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
+                var metaBand = CreateRoundedImage("DeckMetaBand", visual.transform, new Color(1f, 1f, 1f, 0.34f));
+                metaBand.raycastTarget = false;
+                ConfigureRect(metaBand.rectTransform, new Vector2(10f, -32f), new Vector2(cardWidth - 20f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
                 var costText = CreateText("DeckCost", visual.transform, 16, TextAnchor.UpperLeft, DarkTextColor);
                 costText.fontStyle = FontStyles.Bold;
-                ConfigureRect(costText.rectTransform, new Vector2(10f, -34f), new Vector2(cardWidth - 20f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(costText.rectTransform, new Vector2(16f, -34f), new Vector2(cardWidth - 28f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
                 var descriptionText = CreateText("DeckDescription", visual.transform, 14, TextAnchor.UpperLeft, DarkTextColor);
                 descriptionText.textWrappingMode = TextWrappingModes.Normal;
@@ -791,9 +862,9 @@ namespace AshenPath.Battle
                     continue;
                 }
 
-                _deckCardTitleTexts[i].text = cards[i].cardName;
-                _deckCardCostTexts[i].text = $"[{cards[i].spCost}]{GetElementLabel(cards[i].elementType)}";
-                _deckCardDescriptionTexts[i].text = FormatCardDescription(cards[i]);
+                _deckCardTitleTexts[i].text = TruncateWithAsciiEllipsis(cards[i].cardName, 12);
+                _deckCardCostTexts[i].text = GetCostLabel(cards[i]);
+                _deckCardDescriptionTexts[i].text = TruncateWithAsciiEllipsis(FormatCardDescription(cards[i]), 46);
                 _deckCardBackgrounds[i].color = GetElementColor(cards[i].elementType);
                 _deckCardOutlines[i].enabled = false;
             }
@@ -812,6 +883,27 @@ namespace AshenPath.Battle
             }
 
             return $"{FormatKeywords(card.keywords)}\n{card.description}";
+        }
+
+        private static string TruncateWithAsciiEllipsis(string text, int maxLength)
+        {
+            if (string.IsNullOrEmpty(text) || maxLength <= 0)
+            {
+                return string.Empty;
+            }
+
+            var normalized = text.Replace("\r\n", "\n");
+            if (normalized.Length <= maxLength)
+            {
+                return normalized;
+            }
+
+            if (maxLength <= 3)
+            {
+                return new string('.', maxLength);
+            }
+
+            return normalized[..(maxLength - 3)] + "...";
         }
 
         private static string FormatKeywords(IReadOnlyList<string> keywords)
@@ -833,6 +925,64 @@ namespace AshenPath.Battle
             }
 
             return string.Join(" ", formatted);
+        }
+
+        private string GetCostLabel(BattleCardData card)
+        {
+            if (card == null)
+            {
+                return string.Empty;
+            }
+
+            return $"[{card.spCost}]{GetElementLabel(card.elementType)}";
+        }
+
+        private void SetSelectedCardPreview(BattleCardData card)
+        {
+            if (_selectedCardPreviewRoot == null)
+            {
+                return;
+            }
+
+            if (card == null)
+            {
+                _selectedCardPreviewRoot.SetActive(false);
+                return;
+            }
+
+            _selectedCardPreviewRoot.SetActive(true);
+            _selectedCardPreviewBackground.color = GetElementColor(card.elementType);
+            _selectedCardPreviewTitle.text = card.cardName;
+            _selectedCardPreviewCost.text = GetCostLabel(card);
+            _selectedCardPreviewDescription.text = FormatCardDescription(card);
+        }
+
+        private void SetHoveredCardIndex(int cardIndex)
+        {
+            _hoveredCardIndex = cardIndex;
+            RefreshHoveredCardPreview();
+        }
+
+        private void ClearHoveredCardIndex(int cardIndex)
+        {
+            if (_hoveredCardIndex != cardIndex)
+            {
+                return;
+            }
+
+            _hoveredCardIndex = -1;
+            RefreshHoveredCardPreview();
+        }
+
+        private void RefreshHoveredCardPreview()
+        {
+            if (_hoveredCardIndex < 0 || _hoveredCardIndex >= _currentHandCards.Count)
+            {
+                SetSelectedCardPreview(null);
+                return;
+            }
+
+            SetSelectedCardPreview(_currentHandCards[_hoveredCardIndex]);
         }
 
         private GameObject CreateActor(Transform parent, string actorName, Vector2 anchoredPosition, Color accentColor, string label)
