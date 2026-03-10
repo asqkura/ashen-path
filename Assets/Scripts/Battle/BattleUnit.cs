@@ -9,7 +9,8 @@ namespace AshenPath.Battle
             Data = data ?? new BattleUnitData();
             CurrentHp = Mathf.Clamp(Data.maxHp, 0, Data.maxHp);
             CurrentSp = Mathf.Clamp(MaxSp, 0, MaxSp);
-            WeakElement = Data.weakElement;
+            PrimaryWeakElement = Data.weakElement;
+            SecondaryWeakElement = ElementType.None;
         }
 
         public BattleUnitData Data { get; }
@@ -30,7 +31,9 @@ namespace AshenPath.Battle
 
         public int SpRecoveryPerTurn => Mathf.Max(0, Data.spRecoveryPerTurn);
 
-        public ElementType WeakElement { get; private set; }
+        public ElementType PrimaryWeakElement { get; private set; }
+
+        public ElementType SecondaryWeakElement { get; private set; }
 
         public int ShieldCount { get; private set; }
 
@@ -44,7 +47,8 @@ namespace AshenPath.Battle
         {
             CurrentHp = MaxHp;
             CurrentSp = MaxSp;
-            WeakElement = Data.weakElement;
+            PrimaryWeakElement = Data.weakElement;
+            SecondaryWeakElement = ElementType.None;
             ShieldCount = MaxShieldCount;
             BreakTurnsRemaining = 0;
         }
@@ -81,7 +85,14 @@ namespace AshenPath.Battle
 
         public void SetWeakElement(ElementType elementType)
         {
-            WeakElement = elementType;
+            PrimaryWeakElement = elementType;
+            SecondaryWeakElement = ElementType.None;
+        }
+
+        public void SetWeakElements(ElementType primaryElement, ElementType secondaryElement)
+        {
+            PrimaryWeakElement = primaryElement;
+            SecondaryWeakElement = secondaryElement == primaryElement ? ElementType.None : secondaryElement;
         }
 
         public void SetShieldCount(int shieldCount)
@@ -93,7 +104,7 @@ namespace AshenPath.Battle
 
         public bool TryBreakShield(ElementType attackElement)
         {
-            if (IsBroken || ShieldCount <= 0 || attackElement == ElementType.None || attackElement != WeakElement)
+            if (IsBroken || ShieldCount <= 0 || attackElement == ElementType.None || !IsWeakTo(attackElement))
             {
                 return false;
             }
@@ -111,6 +122,11 @@ namespace AshenPath.Battle
         {
             BreakTurnsRemaining = 0;
             ShieldCount = MaxShieldCount;
+        }
+
+        private bool IsWeakTo(ElementType attackElement)
+        {
+            return attackElement == PrimaryWeakElement || (SecondaryWeakElement != ElementType.None && attackElement == SecondaryWeakElement);
         }
     }
 }

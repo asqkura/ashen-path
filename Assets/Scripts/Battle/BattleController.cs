@@ -51,9 +51,13 @@ namespace AshenPath.Battle
             new BattleCardData { cardName = "ウィンド", description = "風で 7 ダメージ", damage = 7, spCost = 1, elementType = ElementType.Wind },
             new BattleCardData { cardName = "ファイア", description = "火で 10 ダメージ", damage = 10, spCost = 3, elementType = ElementType.Fire },
             new BattleCardData { cardName = "ウィンド+", description = "風で 6 ダメージ", damage = 6, spCost = 1, elementType = ElementType.Wind },
-            new BattleCardData { cardName = "ウォーター", description = "水で 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Water },
+            new BattleCardData { cardName = "アイス", description = "氷で 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Ice },
+            new BattleCardData { cardName = "ライト", description = "光で 7 ダメージ", damage = 7, spCost = 2, elementType = ElementType.Light },
+            new BattleCardData { cardName = "ダーク", description = "闇で 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Dark },
             new BattleCardData { cardName = "ファイア+", description = "火で 11 ダメージ。使い切り", damage = 11, spCost = 4, elementType = ElementType.Fire, exhaustAfterUse = true },
-            new BattleCardData { cardName = "ウォーター+", description = "水で 5 ダメージ", damage = 5, spCost = 1, elementType = ElementType.Water },
+            new BattleCardData { cardName = "アイス+", description = "氷で 5 ダメージ", damage = 5, spCost = 1, elementType = ElementType.Ice },
+            new BattleCardData { cardName = "ライト+", description = "光で 11 ダメージ", damage = 11, spCost = 3, elementType = ElementType.Light },
+            new BattleCardData { cardName = "ダーク+", description = "闇で 12 ダメージ。使い切り", damage = 12, spCost = 4, elementType = ElementType.Dark, exhaustAfterUse = true },
         };
 
         private BattleState _state;
@@ -73,8 +77,9 @@ namespace AshenPath.Battle
 
             _playerUnit = new BattleUnit(playerUnitData);
             _enemyUnit = new BattleUnit(enemyUnitData);
-            _enemyUnit.SetWeakElement(GetRandomWeakElement());
-            _enemyUnit.SetShieldCount(Random.Range(3, 6));
+            var weakElements = GetRandomWeakElements();
+            _enemyUnit.SetWeakElements(weakElements.primary, weakElements.secondary);
+            _enemyUnit.SetShieldCount(3);
             _state = BattleState.PlayerTurn;
             _turnCount = 0;
 
@@ -221,7 +226,7 @@ namespace AshenPath.Battle
             RefreshUi();
             if (defender == _enemyUnit)
             {
-                _battleUI.PlayEnemyDamageEffect(dealtDamage);
+                _battleUI.PlayEnemyDamageEffect(dealtDamage, elementType);
             }
 
             var message = $"{attacker.DisplayName} の {attackName}！ {defender.DisplayName} に {dealtDamage} ダメージ";
@@ -337,9 +342,16 @@ namespace AshenPath.Battle
             return total;
         }
 
-        private static ElementType GetRandomWeakElement()
+        private static (ElementType primary, ElementType secondary) GetRandomWeakElements()
         {
-            return (ElementType)Random.Range(1, 4);
+            var primary = (ElementType)Random.Range(1, 6);
+            var secondary = primary;
+            while (secondary == primary)
+            {
+                secondary = (ElementType)Random.Range(1, 6);
+            }
+
+            return (primary, secondary);
         }
     }
 }

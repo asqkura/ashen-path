@@ -4,7 +4,9 @@ namespace AshenPath.Battle
     {
         None,
         Fire,
-        Water,
-        Wind
+        Ice,
+        Wind,
+        Light,
+        Dark
     }
 }

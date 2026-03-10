@@ -15,6 +15,7 @@ namespace AshenPath.Battle
         private RectTransform _visualTarget;
         private Quaternion _targetRotation = Quaternion.identity;
         private bool _isPointerInside;
+        private bool _isSelected;
         private Action _pointerEnterAction;
         private float _targetHoverOffsetY;
         private float _currentHoverOffsetY;
@@ -40,7 +41,7 @@ namespace AshenPath.Battle
         public void OnPointerEnter(PointerEventData eventData)
         {
             _isPointerInside = true;
-            _targetHoverOffsetY = HoverLift;
+            _targetHoverOffsetY = _isSelected ? 0f : HoverLift;
             UpdateRotation(eventData);
             _pointerEnterAction?.Invoke();
         }
@@ -87,6 +88,20 @@ namespace AshenPath.Battle
             {
                 _visualTarget.localRotation = Quaternion.identity;
                 _visualTarget.localPosition = Vector3.zero;
+            }
+        }
+
+        public void SetSelected(bool isSelected)
+        {
+            _isSelected = isSelected;
+            _targetHoverOffsetY = _isPointerInside && !_isSelected ? HoverLift : 0f;
+            if (_isSelected)
+            {
+                _currentHoverOffsetY = 0f;
+                if (_visualTarget != null)
+                {
+                    _visualTarget.localPosition = Vector3.zero;
+                }
             }
         }
 

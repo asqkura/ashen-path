@@ -11,7 +11,7 @@ namespace AshenPath.Battle
     public class BattleUI : MonoBehaviour
     {
         private static readonly Vector2 EnemyPanelSize = new(440f, 182f);
-        private static readonly Vector2 PlayerPanelSize = new(440f, 220f);
+        private static readonly Vector2 PlayerPanelSize = new(440f, 182f);
         private static readonly Vector2 StatusBarSize = new(392f, 52f);
         private static readonly Vector2 ArenaSize = new(1360f, 500f);
         private static readonly Vector2 HandRootSize = new(1520f, 220f);
@@ -19,7 +19,8 @@ namespace AshenPath.Battle
         private static readonly Vector2 ConfirmButtonSize = new(220f, 68f);
         private const float CardAspectRatio = 1.4f;
         private const float PanelPadding = 24f;
-        private const float StatusSectionSpacing = 18f;
+        private const float StatusSectionSpacing = 4f;
+        private const float StatusSectionTopOffset = 46f;
         private const float TopPanelMargin = 32f;
         private const float SelectedCardHop = 18f;
         private const float BarFillAnimationSpeed = 2.8f;
@@ -33,14 +34,14 @@ namespace AshenPath.Battle
         private static readonly Color EnemyAccent = new(0.76f, 0.32f, 0.32f, 1f);
         private static readonly Color PlayerAccent = new(0.32f, 0.72f, 0.58f, 1f);
         private static readonly Color SpAccent = new(0.36f, 0.64f, 0.96f, 1f);
-        private static readonly Color ShieldAccent = new(0.95f, 0.95f, 0.95f, 1f);
+        private static readonly Color ShieldAccent = new(0.42f, 0.7f, 0.98f, 1f);
         private static readonly Color TextColor = new(0.95f, 0.96f, 0.98f, 1f);
         private static readonly Color ArenaColor = new(0.12f, 0.13f, 0.16f, 0.92f);
-        private static readonly Color CardColor = new(0.88f, 0.82f, 0.68f, 1f);
-        private static readonly Color CardSelectedColor = new(0.97f, 0.88f, 0.62f, 1f);
+        private static readonly Color CardColor = new(0.92f, 0.92f, 0.92f, 1f);
+        private static readonly Color CardSelectedColor = new(1f, 1f, 1f, 1f);
         private static readonly Color CardDisabledColor = new(0.35f, 0.35f, 0.35f, 0.95f);
         private static readonly Color DarkTextColor = new(0.17f, 0.13f, 0.09f, 1f);
-        private static readonly Color DamagePopupColor = new(1f, 0.86f, 0.42f, 1f);
+        private static readonly Color DamagePopupColor = new(0.96f, 0.96f, 0.96f, 1f);
 
         private TMP_FontAsset _font;
         private TextMeshProUGUI _turnText;
@@ -128,12 +129,12 @@ namespace AshenPath.Battle
             _enemyWeakText = CreateText("EnemyWeakText", enemyPanel.transform, 20, TextAnchor.MiddleRight, new Color(0.98f, 0.88f, 0.62f, 1f));
             _enemyWeakText.fontStyle = FontStyles.Bold;
             ConfigureRect(_enemyWeakText.rectTransform, new Vector2(-PanelPadding, -PanelPadding - 2f), new Vector2(180f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
-            _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + 48f)), StatusBarSize, EnemyAccent, "HP", out _enemyHpText);
-            _enemyShieldFill = CreateStatusBarSection(enemyPanel.transform, "ShieldSection", new Vector2(PanelPadding, -(PanelPadding + 100f)), StatusBarSize, ShieldAccent, "SHIELD", out _enemyShieldText);
+            _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, EnemyAccent, out _enemyHpText);
+            _enemyShieldFill = CreateStatusBarSection(enemyPanel.transform, "ShieldSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, ShieldAccent, out _enemyShieldText);
 
             var playerPanel = CreateStatusPanel("PlayerPanel", canvasObject.transform, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
-            _playerHpFill = CreateStatusBarSection(playerPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + 48f)), StatusBarSize, PlayerAccent, "HP", out _playerHpText);
-            _playerSpFill = CreateStatusBarSection(playerPanel.transform, "SpSection", new Vector2(PanelPadding, -(PanelPadding + 48f + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, SpAccent, "SP", out _playerSpText);
+            _playerHpFill = CreateStatusBarSection(playerPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, PlayerAccent, out _playerHpText);
+            _playerSpFill = CreateStatusBarSection(playerPanel.transform, "SpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, SpAccent, out _playerSpText);
 
             _resultText = CreateText("ResultText", canvasObject.transform, 54, TextAnchor.MiddleCenter, TextColor);
             ConfigureRect(_resultText.rectTransform, new Vector2(0f, 80f), new Vector2(960f, 80f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
@@ -174,7 +175,7 @@ namespace AshenPath.Battle
             UpdateUnitDisplay(enemy, _enemyNameText, _enemyHpText, _enemyHpFill);
             if (_enemyWeakText != null)
             {
-                _enemyWeakText.text = $"Weak: {GetElementLabel(enemy.WeakElement)}";
+                _enemyWeakText.text = $"Weak: {GetWeakElementLabel(enemy.PrimaryWeakElement, enemy.SecondaryWeakElement)}";
             }
 
             if (_enemyShieldText != null)
@@ -273,8 +274,8 @@ namespace AshenPath.Battle
 
                 _cardTitleTexts[i].text = hand[i].cardName;
                 _cardDescriptionTexts[i].text = hand[i].description;
-                _cardCostTexts[i].text = $"{hand[i].spCost} SP";
-                _cardElementTexts[i].text = GetElementLabel(hand[i].elementType);
+                _cardCostTexts[i].text = $"[{hand[i].spCost}]{GetElementLabel(hand[i].elementType)}";
+                _cardElementTexts[i].text = string.Empty;
             }
         }
 
@@ -302,7 +303,12 @@ namespace AshenPath.Battle
                 var canAfford = hand != null && i < hand.Count && currentSp >= hand[i].spCost;
 
                 _cardRects[i].anchoredPosition = _cardAnchoredPositions[i] + new Vector2(0f, isSelected ? SelectedCardHop : 0f);
-                _cardBackgrounds[i].color = isSelected ? GetSelectedCardColor(hand, i) : (_cardButtons[i].interactable ? GetCardBaseColor(hand, i) : CardDisabledColor);
+                _cardBackgrounds[i].color = _cardButtons[i].interactable ? GetCardBaseColor(hand, i) : CardDisabledColor;
+                var parallaxEffect = _cardButtons[i].GetComponent<CardParallaxEffect>();
+                if (parallaxEffect != null)
+                {
+                    parallaxEffect.SetSelected(isSelected);
+                }
 
                 var titleColor = isSelected || _cardButtons[i].interactable ? DarkTextColor : new Color(0.78f, 0.78f, 0.78f, 1f);
                 var bodyColor = isSelected || _cardButtons[i].interactable ? DarkTextColor : new Color(0.72f, 0.72f, 0.72f, 1f);
@@ -328,7 +334,7 @@ namespace AshenPath.Battle
             _confirmButtonText.text = enabled ? $"確定 ({selectedSpCost} SP)" : "確定";
         }
 
-        public void PlayEnemyDamageEffect(int damage)
+        public void PlayEnemyDamageEffect(int damage, ElementType elementType)
         {
             if (_enemyActorRect == null || damage <= 0)
             {
@@ -344,7 +350,7 @@ namespace AshenPath.Battle
             }
 
             _enemyShakeCoroutine = StartCoroutine(ShakeRect(_enemyActorRect, _enemyActorBasePosition, 0.24f, 20f));
-            StartCoroutine(AnimateDamagePopup(_enemyActorRect, damage));
+            StartCoroutine(AnimateDamagePopup(_enemyActorRect, damage, elementType));
         }
 
         private static bool IsCardSelected(IReadOnlyCollection<int> selectedIndices, int index)
@@ -369,11 +375,24 @@ namespace AshenPath.Battle
         {
             return elementType switch
             {
-                ElementType.Fire => "[火]",
-                ElementType.Water => "[水]",
+                ElementType.Fire => "[炎]",
+                ElementType.Ice => "[氷]",
                 ElementType.Wind => "[風]",
+                ElementType.Light => "[光]",
+                ElementType.Dark => "[闇]",
                 _ => "[無]"
             };
+        }
+
+        private static string GetWeakElementLabel(ElementType primaryElement, ElementType secondaryElement)
+        {
+            var primaryLabel = GetElementLabel(primaryElement);
+            if (secondaryElement == ElementType.None || secondaryElement == primaryElement)
+            {
+                return primaryLabel;
+            }
+
+            return $"{primaryLabel}{GetElementLabel(secondaryElement)}";
         }
 
         private static Color GetElementColor(ElementType elementType)
@@ -381,8 +400,10 @@ namespace AshenPath.Battle
             return elementType switch
             {
                 ElementType.Fire => new Color(0.95f, 0.74f, 0.7f, 1f),
-                ElementType.Water => new Color(0.72f, 0.83f, 0.96f, 1f),
+                ElementType.Ice => new Color(0.72f, 0.9f, 1f, 1f),
                 ElementType.Wind => new Color(0.74f, 0.92f, 0.76f, 1f),
+                ElementType.Light => new Color(1f, 0.95f, 0.74f, 1f),
+                ElementType.Dark => new Color(0.72f, 0.62f, 0.88f, 1f),
                 _ => CardColor
             };
         }
@@ -392,8 +413,10 @@ namespace AshenPath.Battle
             return elementType switch
             {
                 ElementType.Fire => new Color(0.99f, 0.64f, 0.56f, 1f),
-                ElementType.Water => new Color(0.56f, 0.77f, 0.98f, 1f),
+                ElementType.Ice => new Color(0.58f, 0.86f, 1f, 1f),
                 ElementType.Wind => new Color(0.62f, 0.88f, 0.66f, 1f),
+                ElementType.Light => new Color(1f, 0.9f, 0.6f, 1f),
+                ElementType.Dark => new Color(0.62f, 0.5f, 0.86f, 1f),
                 _ => CardSelectedColor
             };
         }
@@ -435,19 +458,15 @@ namespace AshenPath.Battle
             }
         }
 
-        private Image CreateStatusBarSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, string label, out TextMeshProUGUI valueText)
+        private Image CreateStatusBarSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, out TextMeshProUGUI valueText)
         {
             var root = new GameObject(sectionName, typeof(RectTransform));
             root.transform.SetParent(parent, false);
             var rootRect = root.GetComponent<RectTransform>();
             ConfigureRect(rootRect, anchoredPosition, size, new Vector2(0f, 1f), new Vector2(0f, 1f));
 
-            var labelText = CreateText("Label", root.transform, 18, TextAnchor.MiddleLeft, new Color(0.76f, 0.82f, 0.94f, 1f));
-            labelText.text = label;
-            ConfigureRect(labelText.rectTransform, new Vector2(0f, -10f), new Vector2(60f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-
             var barBackground = CreateRoundedImage("BarBackground", root.transform, new Color(0.1f, 0.12f, 0.16f, 1f));
-            ConfigureRect(barBackground.rectTransform, new Vector2(0f, -28f), new Vector2(size.x, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            ConfigureRect(barBackground.rectTransform, new Vector2(0f, -12f), new Vector2(size.x, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
             barBackground.gameObject.AddComponent<Mask>().showMaskGraphic = true;
 
             var fill = CreateSolidFillImage("Fill", barBackground.transform, fillColor);
@@ -537,7 +556,7 @@ namespace AshenPath.Battle
                 _cardElementTexts.Add(elementText);
 
                 var cost = CreateText("Cost", visual.transform, 20, TextAnchor.UpperLeft, DarkTextColor);
-                ConfigureRect(cost.rectTransform, new Vector2(18f, -52f), new Vector2(96f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(cost.rectTransform, new Vector2(18f, -52f), new Vector2(cardWidth - 36f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
                 cost.fontStyle = FontStyles.Bold;
                 _cardCostTexts.Add(cost);
 
@@ -621,10 +640,10 @@ namespace AshenPath.Battle
             var button = buttonObject.GetComponent<Button>();
             var colors = button.colors;
             colors.normalColor = CardColor;
-            colors.highlightedColor = new Color(0.95f, 0.89f, 0.75f, 1f);
-            colors.pressedColor = new Color(0.79f, 0.72f, 0.58f, 1f);
+            colors.highlightedColor = colors.normalColor;
+            colors.pressedColor = colors.normalColor;
             colors.disabledColor = CardDisabledColor;
-            colors.selectedColor = colors.highlightedColor;
+            colors.selectedColor = colors.normalColor;
             button.colors = colors;
 
             if (enableParallax)
@@ -900,9 +919,10 @@ namespace AshenPath.Battle
             _enemyShakeCoroutine = null;
         }
 
-        private IEnumerator AnimateDamagePopup(RectTransform targetRect, int damage)
+        private IEnumerator AnimateDamagePopup(RectTransform targetRect, int damage, ElementType elementType)
         {
-            var popup = CreateText("DamagePopup", targetRect, 42, TextAnchor.MiddleCenter, DamagePopupColor);
+            var popupColor = GetDamagePopupColor(elementType);
+            var popup = CreateText("DamagePopup", targetRect, 42, TextAnchor.MiddleCenter, popupColor);
             popup.text = damage.ToString();
             popup.fontStyle = FontStyles.Bold;
             popup.outlineWidth = 0.18f;
@@ -917,7 +937,7 @@ namespace AshenPath.Battle
             var peakScale = new Vector3(1.18f, 1.18f, 1f);
             const float duration = 0.6f;
             var elapsed = 0f;
-            var color = DamagePopupColor;
+            var color = popupColor;
             var outlineColor = popup.outlineColor;
 
             while (elapsed < duration)
@@ -935,6 +955,11 @@ namespace AshenPath.Battle
             }
 
             Destroy(popup.gameObject);
+        }
+
+        private static Color GetDamagePopupColor(ElementType elementType)
+        {
+            return elementType == ElementType.None ? DamagePopupColor : GetSelectedElementColor(elementType);
         }
 
         private Sprite GetRoundedPanelSprite()
