@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
@@ -22,26 +23,30 @@ namespace AshenPath.Battle
         private static readonly Color CardDisabledColor = new(0.35f, 0.35f, 0.35f, 0.95f);
         private static readonly Color DarkTextColor = new(0.17f, 0.13f, 0.09f, 1f);
 
-        private Font _font;
-        private Text _turnText;
-        private Text _resultText;
-        private Text _playerNameText;
-        private Text _playerHpText;
+        private TMP_FontAsset _font;
+        private TextMeshProUGUI _turnText;
+        private TextMeshProUGUI _resultText;
+        private TextMeshProUGUI _playerNameText;
+        private TextMeshProUGUI _playerHpText;
         private Image _playerHpFill;
-        private Text _playerSpText;
+        private TextMeshProUGUI _playerSpText;
         private Image _playerSpFill;
-        private Text _enemyNameText;
-        private Text _enemyHpText;
+        private TextMeshProUGUI _enemyNameText;
+        private TextMeshProUGUI _enemyHpText;
         private Image _enemyHpFill;
         private readonly List<Button> _cardButtons = new();
-        private readonly List<Text> _cardTitleTexts = new();
-        private readonly List<Text> _cardDescriptionTexts = new();
-        private readonly List<Text> _cardCostTexts = new();
+        private readonly List<TextMeshProUGUI> _cardTitleTexts = new();
+        private readonly List<TextMeshProUGUI> _cardDescriptionTexts = new();
+        private readonly List<TextMeshProUGUI> _cardCostTexts = new();
         private readonly List<Image> _cardBackgrounds = new();
 
         public void Build()
         {
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _font = TMP_Settings.defaultFontAsset;
+            if (_font == null)
+            {
+                _font = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+            }
 
             var canvasObject = new GameObject("BattleCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasObject.transform.SetParent(transform, false);
@@ -146,14 +151,14 @@ namespace AshenPath.Battle
             }
         }
 
-        private void UpdateUnitDisplay(BattleUnit unit, Text nameText, Text hpText, Image hpFill)
+        private void UpdateUnitDisplay(BattleUnit unit, TextMeshProUGUI nameText, TextMeshProUGUI hpText, Image hpFill)
         {
             nameText.text = unit.DisplayName;
             hpText.text = $"HP {unit.CurrentHp} / {unit.MaxHp}";
             hpFill.fillAmount = unit.CurrentHp / (float)unit.MaxHp;
         }
 
-        private Image CreateHpSection(Transform parent, Vector2 anchoredPosition, Vector2 size, Color fillColor, out Text hpText)
+        private Image CreateHpSection(Transform parent, Vector2 anchoredPosition, Vector2 size, Color fillColor, out TextMeshProUGUI hpText)
         {
             var root = new GameObject("HpSection", typeof(RectTransform));
             root.transform.SetParent(parent, false);
@@ -176,7 +181,7 @@ namespace AshenPath.Battle
             return fill;
         }
 
-        private Image CreateResourceSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, string label, out Text valueText)
+        private Image CreateResourceSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, string label, out TextMeshProUGUI valueText)
         {
             var root = new GameObject(sectionName, typeof(RectTransform));
             root.transform.SetParent(parent, false);
@@ -239,20 +244,20 @@ namespace AshenPath.Battle
 
                 var title = CreateText("Title", button.transform, 28, TextAnchor.UpperLeft, DarkTextColor);
                 ConfigureRect(title.rectTransform, new Vector2(18f, -18f), new Vector2(cardWidth - 36f, 34f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-                title.fontStyle = FontStyle.Bold;
-                title.horizontalOverflow = HorizontalWrapMode.Wrap;
-                title.verticalOverflow = VerticalWrapMode.Truncate;
+                title.fontStyle = FontStyles.Bold;
+                title.textWrappingMode = TextWrappingModes.Normal;
+                title.overflowMode = TextOverflowModes.Truncate;
                 _cardTitleTexts.Add(title);
 
                 var cost = CreateText("Cost", button.transform, 20, TextAnchor.UpperRight, DarkTextColor);
                 ConfigureRect(cost.rectTransform, new Vector2(-18f, -18f), new Vector2(96f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
-                cost.fontStyle = FontStyle.Bold;
+                cost.fontStyle = FontStyles.Bold;
                 _cardCostTexts.Add(cost);
 
                 var description = CreateText("Description", button.transform, 22, TextAnchor.UpperLeft, DarkTextColor);
                 ConfigureRect(description.rectTransform, new Vector2(18f, -62f), new Vector2(cardWidth - 36f, 86f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-                description.horizontalOverflow = HorizontalWrapMode.Wrap;
-                description.verticalOverflow = VerticalWrapMode.Truncate;
+                description.textWrappingMode = TextWrappingModes.Normal;
+                description.overflowMode = TextOverflowModes.Truncate;
                 _cardDescriptionTexts.Add(description);
             }
         }
@@ -305,20 +310,37 @@ namespace AshenPath.Battle
             return button;
         }
 
-        private Text CreateText(string textName, Transform parent, int fontSize, TextAnchor alignment, Color color)
+        private TextMeshProUGUI CreateText(string textName, Transform parent, int fontSize, TextAnchor alignment, Color color)
         {
-            var textObject = new GameObject(textName, typeof(Text));
+            var textObject = new GameObject(textName, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
 
-            var text = textObject.GetComponent<Text>();
+            var text = textObject.GetComponent<TextMeshProUGUI>();
             text.font = _font;
             text.fontSize = fontSize;
-            text.alignment = alignment;
+            text.alignment = ConvertAlignment(alignment);
             text.color = color;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
 
             return text;
+        }
+
+        private static TextAlignmentOptions ConvertAlignment(TextAnchor alignment)
+        {
+            return alignment switch
+            {
+                TextAnchor.UpperLeft => TextAlignmentOptions.TopLeft,
+                TextAnchor.UpperCenter => TextAlignmentOptions.Top,
+                TextAnchor.UpperRight => TextAlignmentOptions.TopRight,
+                TextAnchor.MiddleLeft => TextAlignmentOptions.MidlineLeft,
+                TextAnchor.MiddleCenter => TextAlignmentOptions.Midline,
+                TextAnchor.MiddleRight => TextAlignmentOptions.MidlineRight,
+                TextAnchor.LowerLeft => TextAlignmentOptions.BottomLeft,
+                TextAnchor.LowerCenter => TextAlignmentOptions.Bottom,
+                TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
+                _ => TextAlignmentOptions.TopLeft
+            };
         }
 
         private Image CreateImage(string imageName, Transform parent, Color color)
