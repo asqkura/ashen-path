@@ -2,16 +2,23 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
-
+using System.Text;
 namespace AshenPath.Battle
 {
     public class BattleUI : MonoBehaviour
     {
-        private static readonly Vector2 EnemyPanelSize = new(440f, 136f);
-        private static readonly Vector2 PlayerPanelSize = new(440f, 176f);
-        private static readonly Vector2 HpSectionSize = new(384f, 64f);
+        private static readonly Vector2 EnemyPanelSize = new(440f, 150f);
+        private static readonly Vector2 PlayerPanelSize = new(440f, 220f);
+        private static readonly Vector2 StatusBarSize = new(392f, 52f);
         private static readonly Vector2 ArenaSize = new(1360f, 500f);
         private static readonly Vector2 HandRootSize = new(1520f, 220f);
+        private static readonly Vector2 LogPanelSize = new(520f, 160f);
+        private static readonly Vector2 ConfirmButtonSize = new(220f, 68f);
+        private const float CardAspectRatio = 1.4f;
+        private const float PanelPadding = 24f;
+        private const float StatusSectionSpacing = 18f;
+        private const float TopPanelMargin = 32f;
+        private const float SelectedCardHop = 18f;
         private static readonly Color BackgroundColor = new(0.08f, 0.09f, 0.12f, 1f);
         private static readonly Color PanelColor = new(0.14f, 0.16f, 0.2f, 0.92f);
         private static readonly Color EnemyAccent = new(0.76f, 0.32f, 0.32f, 1f);
@@ -20,6 +27,7 @@ namespace AshenPath.Battle
         private static readonly Color TextColor = new(0.95f, 0.96f, 0.98f, 1f);
         private static readonly Color ArenaColor = new(0.12f, 0.13f, 0.16f, 0.92f);
         private static readonly Color CardColor = new(0.88f, 0.82f, 0.68f, 1f);
+        private static readonly Color CardSelectedColor = new(0.97f, 0.88f, 0.62f, 1f);
         private static readonly Color CardDisabledColor = new(0.35f, 0.35f, 0.35f, 0.95f);
         private static readonly Color DarkTextColor = new(0.17f, 0.13f, 0.09f, 1f);
 
@@ -34,11 +42,21 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _enemyNameText;
         private TextMeshProUGUI _enemyHpText;
         private Image _enemyHpFill;
+        private TextMeshProUGUI _logText;
+        private TextMeshProUGUI _turnCountText;
+        private Button _confirmButton;
+        private TextMeshProUGUI _confirmButtonText;
+        private readonly Queue<string> _battleLogs = new();
         private readonly List<Button> _cardButtons = new();
+        private readonly List<RectTransform> _cardRects = new();
+        private readonly List<Vector2> _cardAnchoredPositions = new();
         private readonly List<TextMeshProUGUI> _cardTitleTexts = new();
         private readonly List<TextMeshProUGUI> _cardDescriptionTexts = new();
         private readonly List<TextMeshProUGUI> _cardCostTexts = new();
         private readonly List<Image> _cardBackgrounds = new();
+        private readonly StringBuilder _logBuilder = new();
+        private Sprite _roundedPanelSprite;
+        private Sprite _solidFillSprite;
 
         public void Build()
         {
@@ -66,25 +84,20 @@ namespace AshenPath.Battle
 
             CreateArena(canvasObject.transform);
 
-            var enemyPanel = CreatePanel("EnemyPanel", canvasObject.transform, new Vector2(-48f, -44f), EnemyPanelSize, new Vector2(1f, 1f));
-            _enemyNameText = CreateText("EnemyName", enemyPanel.transform, 34, TextAnchor.MiddleLeft, TextColor);
-            ConfigureRect(_enemyNameText.rectTransform, new Vector2(28f, -28f), new Vector2(384f, 36f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-            _enemyHpFill = CreateHpSection(enemyPanel.transform, new Vector2(28f, -88f), HpSectionSize, EnemyAccent, out _enemyHpText);
+            var enemyPanel = CreateStatusPanel("EnemyPanel", canvasObject.transform, new Vector2(TopPanelMargin, -TopPanelMargin), EnemyPanelSize, new Vector2(0f, 1f), "EnemyName", out _enemyNameText);
+            _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + 48f)), StatusBarSize, EnemyAccent, "HP", out _enemyHpText);
 
-            var playerPanel = CreatePanel("PlayerPanel", canvasObject.transform, new Vector2(48f, 272f), PlayerPanelSize, new Vector2(0f, 0f));
-            _playerNameText = CreateText("PlayerName", playerPanel.transform, 34, TextAnchor.MiddleLeft, TextColor);
-            ConfigureRect(_playerNameText.rectTransform, new Vector2(28f, -28f), new Vector2(384f, 36f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-            _playerHpFill = CreateHpSection(playerPanel.transform, new Vector2(28f, -88f), HpSectionSize, PlayerAccent, out _playerHpText);
-            _playerSpFill = CreateResourceSection(playerPanel.transform, "SpSection", new Vector2(28f, -130f), HpSectionSize, SpAccent, "SP", out _playerSpText);
-
-            _turnText = CreateText("TurnText", canvasObject.transform, 30, TextAnchor.MiddleCenter, TextColor);
-            ConfigureRect(_turnText.rectTransform, new Vector2(0f, 224f), new Vector2(1120f, 60f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            var playerPanel = CreateStatusPanel("PlayerPanel", canvasObject.transform, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
+            _playerHpFill = CreateStatusBarSection(playerPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + 48f)), StatusBarSize, PlayerAccent, "HP", out _playerHpText);
+            _playerSpFill = CreateStatusBarSection(playerPanel.transform, "SpSection", new Vector2(PanelPadding, -(PanelPadding + 48f + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, SpAccent, "SP", out _playerSpText);
 
             _resultText = CreateText("ResultText", canvasObject.transform, 54, TextAnchor.MiddleCenter, TextColor);
             ConfigureRect(_resultText.rectTransform, new Vector2(0f, 80f), new Vector2(960f, 80f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
             _resultText.gameObject.SetActive(false);
 
+            CreateBattleLog(canvasObject.transform);
             CreateCardHand(canvasObject.transform);
+            CreateConfirmButton(canvasObject.transform);
         }
 
         public void Bind(BattleController controller)
@@ -94,6 +107,12 @@ namespace AshenPath.Battle
                 var cardIndex = i;
                 _cardButtons[i].onClick.RemoveAllListeners();
                 _cardButtons[i].onClick.AddListener(() => controller.PerformPlayerCard(cardIndex));
+            }
+
+            if (_confirmButton != null)
+            {
+                _confirmButton.onClick.RemoveAllListeners();
+                _confirmButton.onClick.AddListener(controller.ConfirmSelectedCards);
             }
         }
 
@@ -111,13 +130,67 @@ namespace AshenPath.Battle
 
         public void SetTurnText(string message)
         {
-            _turnText.text = message;
+            if (_turnText != null)
+            {
+                _turnText.text = message;
+            }
+        }
+
+        public void SetTurnCount(int turnCount)
+        {
+            if (_turnCountText != null)
+            {
+                _turnCountText.text = $"TURN {Mathf.Max(1, turnCount)}";
+            }
         }
 
         public void SetResultText(string message, bool visible)
         {
             _resultText.text = message;
             _resultText.gameObject.SetActive(visible);
+        }
+
+        public void ClearBattleLog()
+        {
+            _battleLogs.Clear();
+            if (_logText != null)
+            {
+                _logText.text = string.Empty;
+            }
+        }
+
+        public void AddBattleLog(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            const int maxLogEntries = 6;
+            _battleLogs.Enqueue(message);
+            while (_battleLogs.Count > maxLogEntries)
+            {
+                _battleLogs.Dequeue();
+            }
+
+            if (_logText == null)
+            {
+                return;
+            }
+
+            _logBuilder.Clear();
+            foreach (var entry in _battleLogs)
+            {
+                if (_logBuilder.Length > 0)
+                {
+                    _logBuilder.Append('\n');
+                }
+
+                _logBuilder.Append("・");
+                _logBuilder.Append(entry);
+            }
+
+            _logText.text = _logBuilder.ToString();
         }
 
         public void RefreshHand(IReadOnlyList<BattleCardData> hand)
@@ -138,17 +211,69 @@ namespace AshenPath.Battle
             }
         }
 
-        public void SetCardsInteractable(bool interactable, IReadOnlyList<BattleCardData> hand, int currentSp)
+        public void SetCardsInteractable(bool interactable, IReadOnlyList<BattleCardData> hand, int currentSp, IReadOnlyCollection<int> selectedIndices)
         {
             for (var i = 0; i < _cardButtons.Count; i++)
             {
+                var isSelected = IsCardSelected(selectedIndices, i);
                 var canAfford = hand != null && i < hand.Count && currentSp >= hand[i].spCost;
-                _cardButtons[i].interactable = interactable && _cardButtons[i].gameObject.activeSelf && canAfford;
+                _cardButtons[i].interactable = interactable && _cardButtons[i].gameObject.activeSelf && (canAfford || isSelected);
                 _cardBackgrounds[i].color = _cardButtons[i].interactable ? CardColor : CardDisabledColor;
                 _cardTitleTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.78f, 0.78f, 0.78f, 1f);
                 _cardDescriptionTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.72f, 0.72f, 0.72f, 1f);
                 _cardCostTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.82f, 0.82f, 0.82f, 1f);
             }
+        }
+
+        public void SetSelectedCards(IReadOnlyCollection<int> selectedIndices, IReadOnlyList<BattleCardData> hand, int currentSp)
+        {
+            for (var i = 0; i < _cardButtons.Count; i++)
+            {
+                var isSelected = IsCardSelected(selectedIndices, i);
+                var isActive = _cardButtons[i].gameObject.activeSelf;
+                var canAfford = hand != null && i < hand.Count && currentSp >= hand[i].spCost;
+
+                _cardRects[i].anchoredPosition = _cardAnchoredPositions[i] + new Vector2(0f, isSelected ? SelectedCardHop : 0f);
+                _cardBackgrounds[i].color = isSelected ? CardSelectedColor : (_cardButtons[i].interactable ? CardColor : CardDisabledColor);
+
+                var titleColor = isSelected || _cardButtons[i].interactable ? DarkTextColor : new Color(0.78f, 0.78f, 0.78f, 1f);
+                var bodyColor = isSelected || _cardButtons[i].interactable ? DarkTextColor : new Color(0.72f, 0.72f, 0.72f, 1f);
+                var costColor = isSelected || _cardButtons[i].interactable || (isActive && canAfford) ? DarkTextColor : new Color(0.82f, 0.82f, 0.82f, 1f);
+
+                _cardTitleTexts[i].color = titleColor;
+                _cardDescriptionTexts[i].color = bodyColor;
+                _cardCostTexts[i].color = costColor;
+            }
+        }
+
+        public void SetConfirmButtonState(bool enabled, int selectedSpCost)
+        {
+            if (_confirmButton == null || _confirmButtonText == null)
+            {
+                return;
+            }
+
+            _confirmButton.interactable = enabled;
+            _confirmButton.gameObject.SetActive(true);
+            _confirmButtonText.text = enabled ? $"確定 ({selectedSpCost} SP)" : "確定";
+        }
+
+        private static bool IsCardSelected(IReadOnlyCollection<int> selectedIndices, int index)
+        {
+            if (selectedIndices == null)
+            {
+                return false;
+            }
+
+            foreach (var selectedIndex in selectedIndices)
+            {
+                if (selectedIndex == index)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void UpdateUnitDisplay(BattleUnit unit, TextMeshProUGUI nameText, TextMeshProUGUI hpText, Image hpFill)
@@ -158,51 +283,31 @@ namespace AshenPath.Battle
             hpFill.fillAmount = unit.CurrentHp / (float)unit.MaxHp;
         }
 
-        private Image CreateHpSection(Transform parent, Vector2 anchoredPosition, Vector2 size, Color fillColor, out TextMeshProUGUI hpText)
+        private Image CreateStatusBarSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, string label, out TextMeshProUGUI valueText)
         {
-            var root = new GameObject("HpSection", typeof(RectTransform));
+            var root = new GameObject(sectionName, typeof(RectTransform));
             root.transform.SetParent(parent, false);
             var rootRect = root.GetComponent<RectTransform>();
             ConfigureRect(rootRect, anchoredPosition, size, new Vector2(0f, 1f), new Vector2(0f, 1f));
 
-            var barBackground = CreateImage("HpBarBackground", root.transform, new Color(0.12f, 0.13f, 0.16f, 1f));
-            ConfigureRect(barBackground.rectTransform, new Vector2(0f, -8f), new Vector2(size.x, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-
-            var fill = CreateImage("HpFill", barBackground.transform, fillColor);
-            fill.type = Image.Type.Filled;
-            fill.fillMethod = Image.FillMethod.Horizontal;
-            fill.fillOrigin = (int)Image.OriginHorizontal.Left;
-            fill.fillAmount = 1f;
-            StretchFullScreen(fill.rectTransform);
-
-            hpText = CreateText("HpText", root.transform, 24, TextAnchor.MiddleLeft, TextColor);
-            ConfigureRect(hpText.rectTransform, new Vector2(0f, -46f), new Vector2(size.x, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-
-            return fill;
-        }
-
-        private Image CreateResourceSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, string label, out TextMeshProUGUI valueText)
-        {
-            var root = new GameObject(sectionName, typeof(RectTransform));
-            root.transform.SetParent(parent, false);
-            ConfigureRect(root.GetComponent<RectTransform>(), anchoredPosition, size, new Vector2(0f, 1f), new Vector2(0f, 1f));
-
             var labelText = CreateText("Label", root.transform, 18, TextAnchor.MiddleLeft, new Color(0.76f, 0.82f, 0.94f, 1f));
             labelText.text = label;
-            ConfigureRect(labelText.rectTransform, new Vector2(0f, -10f), new Vector2(52f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            ConfigureRect(labelText.rectTransform, new Vector2(0f, -10f), new Vector2(60f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
-            var barBackground = CreateImage("BarBackground", root.transform, new Color(0.1f, 0.12f, 0.16f, 1f));
-            ConfigureRect(barBackground.rectTransform, new Vector2(60f, -8f), new Vector2(size.x - 60f, 18f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            var barBackground = CreateRoundedImage("BarBackground", root.transform, new Color(0.1f, 0.12f, 0.16f, 1f));
+            ConfigureRect(barBackground.rectTransform, new Vector2(0f, -28f), new Vector2(size.x, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            barBackground.gameObject.AddComponent<Mask>().showMaskGraphic = true;
 
-            var fill = CreateImage("Fill", barBackground.transform, fillColor);
+            var fill = CreateSolidFillImage("Fill", barBackground.transform, fillColor);
             fill.type = Image.Type.Filled;
             fill.fillMethod = Image.FillMethod.Horizontal;
             fill.fillOrigin = (int)Image.OriginHorizontal.Left;
             fill.fillAmount = 1f;
             StretchFullScreen(fill.rectTransform);
 
-            valueText = CreateText("Value", root.transform, 20, TextAnchor.MiddleLeft, TextColor);
-            ConfigureRect(valueText.rectTransform, new Vector2(60f, -34f), new Vector2(size.x - 60f, 22f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            valueText = CreateText("Value", barBackground.transform, 20, TextAnchor.MiddleRight, TextColor);
+            valueText.fontStyle = FontStyles.Bold;
+            ConfigureRect(valueText.rectTransform, new Vector2(-12f, 0f), new Vector2(size.x - 24f, 24f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
 
             return fill;
         }
@@ -212,15 +317,29 @@ namespace AshenPath.Battle
             var arena = CreatePanel("Arena", parent, new Vector2(0f, 44f), ArenaSize, new Vector2(0.5f, 0.5f));
             arena.GetComponent<Image>().color = ArenaColor;
 
-            CreateActor(arena.transform, "EnemyActor", new Vector2(420f, 30f), EnemyAccent, "ENEMY");
-            CreateActor(arena.transform, "PlayerActor", new Vector2(-420f, 30f), PlayerAccent, "PLAYER");
+            CreateActor(arena.transform, "EnemyActor", new Vector2(-420f, 30f), EnemyAccent, "ENEMY");
+            CreateActor(arena.transform, "PlayerActor", new Vector2(420f, 30f), PlayerAccent, "PLAYER");
 
-            var divider = CreateImage("Divider", arena.transform, new Color(0.22f, 0.24f, 0.28f, 1f));
-            ConfigureRect(divider.rectTransform, new Vector2(0f, 40f), new Vector2(2f, 320f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        }
 
-            var vsText = CreateText("VersusText", arena.transform, 40, TextAnchor.MiddleCenter, new Color(0.82f, 0.83f, 0.86f, 1f));
-            vsText.text = "VS";
-            ConfigureRect(vsText.rectTransform, new Vector2(0f, 0f), new Vector2(320f, 60f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        private void CreateBattleLog(Transform parent)
+        {
+            var logPanel = CreatePanel("BattleLogPanel", parent, new Vector2(0f, -TopPanelMargin), LogPanelSize, new Vector2(0.5f, 1f));
+            logPanel.GetComponent<Image>().color = new Color(0.1f, 0.11f, 0.14f, 0.94f);
+
+            var title = CreateText("BattleLogTitle", logPanel.transform, 24, TextAnchor.MiddleLeft, new Color(0.82f, 0.84f, 0.9f, 1f));
+            title.text = "LOG";
+            title.fontStyle = FontStyles.Bold;
+            ConfigureRect(title.rectTransform, new Vector2(20f, -18f), new Vector2(100f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            _turnCountText = CreateText("TurnCountText", logPanel.transform, 22, TextAnchor.MiddleRight, new Color(0.82f, 0.84f, 0.9f, 1f));
+            _turnCountText.fontStyle = FontStyles.Bold;
+            ConfigureRect(_turnCountText.rectTransform, new Vector2(-20f, -18f), new Vector2(160f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+
+            _logText = CreateText("BattleLogText", logPanel.transform, 20, TextAnchor.UpperLeft, TextColor);
+            _logText.textWrappingMode = TextWrappingModes.Normal;
+            _logText.overflowMode = TextOverflowModes.Truncate;
+            ConfigureRect(_logText.rectTransform, new Vector2(20f, -54f), new Vector2(LogPanelSize.x - 40f, LogPanelSize.y - 74f), new Vector2(0f, 1f), new Vector2(0f, 1f));
         }
 
         private void CreateCardHand(Transform parent)
@@ -229,9 +348,9 @@ namespace AshenPath.Battle
             handRoot.transform.SetParent(parent, false);
             ConfigureRect(handRoot.GetComponent<RectTransform>(), new Vector2(0f, 30f), HandRootSize, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
 
-            const float cardWidth = 260f;
-            const float cardHeight = 180f;
-            const float spacing = 18f;
+            const float cardWidth = 200f;
+            var cardHeight = cardWidth * CardAspectRatio;
+            const float spacing = 22f;
             var totalWidth = (cardWidth * 5f) + (spacing * 4f);
             var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
 
@@ -240,6 +359,8 @@ namespace AshenPath.Battle
                 var x = startX + i * (cardWidth + spacing);
                 var button = CreateCardButton(handRoot.transform, new Vector2(x, 0f), new Vector2(cardWidth, cardHeight));
                 _cardButtons.Add(button);
+                _cardRects.Add(button.GetComponent<RectTransform>());
+                _cardAnchoredPositions.Add(new Vector2(x, 0f));
                 _cardBackgrounds.Add(button.GetComponent<Image>());
 
                 var title = CreateText("Title", button.transform, 28, TextAnchor.UpperLeft, DarkTextColor);
@@ -284,17 +405,48 @@ namespace AshenPath.Battle
             panel.transform.SetParent(parent, false);
             var image = panel.GetComponent<Image>();
             image.color = PanelColor;
+            image.sprite = GetRoundedPanelSprite();
+            image.type = Image.Type.Sliced;
             ConfigureRect(image.rectTransform, anchoredPosition, size, anchor, anchor);
             return panel;
         }
 
+        private GameObject CreateStatusPanel(string panelName, Transform parent, Vector2 anchoredPosition, Vector2 size, Vector2 anchor, string nameTextName, out TextMeshProUGUI nameText)
+        {
+            var panel = CreatePanel(panelName, parent, anchoredPosition, size, anchor);
+            nameText = CreateText(nameTextName, panel.transform, 34, TextAnchor.MiddleLeft, TextColor);
+            nameText.fontStyle = FontStyles.Bold;
+            ConfigureRect(nameText.rectTransform, new Vector2(PanelPadding, -PanelPadding), new Vector2(size.x - (PanelPadding * 2f), 32f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            return panel;
+        }
+
+        private void CreateConfirmButton(Transform parent)
+        {
+            _confirmButton = CreateCardButton(parent, new Vector2(-32f, 32f), ConfirmButtonSize);
+            ConfigureRect(_confirmButton.GetComponent<RectTransform>(), new Vector2(-32f, 32f), ConfirmButtonSize, new Vector2(1f, 0f), new Vector2(1f, 0f));
+            _confirmButton.gameObject.name = "ConfirmButton";
+            _confirmButton.GetComponent<Image>().color = new Color(0.84f, 0.74f, 0.52f, 1f);
+
+            _confirmButtonText = CreateText("ConfirmLabel", _confirmButton.transform, 24, TextAnchor.MiddleCenter, DarkTextColor);
+            _confirmButtonText.fontStyle = FontStyles.Bold;
+            _confirmButtonText.text = "確定";
+            ConfigureRect(_confirmButtonText.rectTransform, Vector2.zero, ConfirmButtonSize, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        }
+
         private Button CreateCardButton(Transform parent, Vector2 anchoredPosition, Vector2 size)
         {
-            var buttonObject = new GameObject("CardButton", typeof(Image), typeof(Button));
+            var buttonObject = new GameObject("CardButton", typeof(Image), typeof(Button), typeof(Outline));
             buttonObject.transform.SetParent(parent, false);
 
             var image = buttonObject.GetComponent<Image>();
             image.color = CardColor;
+            image.sprite = GetRoundedPanelSprite();
+            image.type = Image.Type.Sliced;
+
+            var outline = buttonObject.GetComponent<Outline>();
+            outline.effectColor = new Color(0.26f, 0.19f, 0.1f, 0.95f);
+            outline.effectDistance = new Vector2(4f, -4f);
+            outline.useGraphicAlpha = true;
 
             var button = buttonObject.GetComponent<Button>();
             var colors = button.colors;
@@ -351,6 +503,81 @@ namespace AshenPath.Battle
             var image = imageObject.GetComponent<Image>();
             image.color = color;
             return image;
+        }
+
+        private Image CreateRoundedImage(string imageName, Transform parent, Color color)
+        {
+            var image = CreateImage(imageName, parent, color);
+            image.sprite = GetRoundedPanelSprite();
+            image.type = Image.Type.Sliced;
+            return image;
+        }
+
+        private Image CreateSolidFillImage(string imageName, Transform parent, Color color)
+        {
+            var image = CreateImage(imageName, parent, color);
+            image.sprite = GetSolidFillSprite();
+            image.type = Image.Type.Simple;
+            return image;
+        }
+
+        private Sprite GetRoundedPanelSprite()
+        {
+            if (_roundedPanelSprite != null)
+            {
+                return _roundedPanelSprite;
+            }
+
+            const int textureSize = 32;
+            const int radius = 6;
+            var texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                name = "RoundedPanelTexture"
+            };
+
+            var clear = new Color32(255, 255, 255, 0);
+            var fill = new Color32(255, 255, 255, 255);
+            var center = new Vector2(textureSize * 0.5f, textureSize * 0.5f);
+            var innerHalf = (textureSize * 0.5f) - radius;
+
+            for (var y = 0; y < textureSize; y++)
+            {
+                for (var x = 0; x < textureSize; x++)
+                {
+                    var local = new Vector2(Mathf.Abs((x + 0.5f) - center.x), Mathf.Abs((y + 0.5f) - center.y));
+                    var cornerDelta = new Vector2(Mathf.Max(0f, local.x - innerHalf), Mathf.Max(0f, local.y - innerHalf));
+                    var inside = cornerDelta.sqrMagnitude <= radius * radius;
+                    texture.SetPixel(x, y, inside ? fill : clear);
+                }
+            }
+
+            texture.Apply();
+            _roundedPanelSprite = Sprite.Create(texture, new Rect(0f, 0f, textureSize, textureSize), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+            _roundedPanelSprite.name = "RoundedPanelSprite";
+            return _roundedPanelSprite;
+        }
+
+        private Sprite GetSolidFillSprite()
+        {
+            if (_solidFillSprite != null)
+            {
+                return _solidFillSprite;
+            }
+
+            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                name = "SolidFillTexture"
+            };
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+
+            _solidFillSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+            _solidFillSprite.name = "SolidFillSprite";
+            return _solidFillSprite;
         }
 
         private static void StretchFullScreen(RectTransform rectTransform)

@@ -59,7 +59,9 @@ namespace AshenPath.Battle
         private BattleUnit _enemyUnit;
         private BattleUI _battleUI;
         private Coroutine _enemyTurnCoroutine;
+        private int _turnCount;
         private readonly List<BattleCardData> _hand = new();
+        private readonly List<int> _selectedCardIndices = new();
 
         public void Initialize(BattleUI battleUI)
         {
@@ -69,9 +71,12 @@ namespace AshenPath.Battle
             _playerUnit = new BattleUnit(playerUnitData);
             _enemyUnit = new BattleUnit(enemyUnitData);
             _state = BattleState.PlayerTurn;
+            _turnCount = 0;
 
             RefreshUi();
             _battleUI.SetResultText(string.Empty, false);
+            _battleUI.ClearBattleLog();
+            _battleUI.AddBattleLog($"{_playerUnit.DisplayName} と {_enemyUnit.DisplayName} の戦闘開始");
             StartPlayerTurn("プレイヤーのターンです");
         }
 
@@ -87,31 +92,71 @@ namespace AshenPath.Battle
                 return;
             }
 
-            var selectedCard = _hand[cardIndex];
-            if (!_playerUnit.SpendSp(selectedCard.spCost))
+            if (_selectedCardIndices.Contains(cardIndex))
             {
-                _battleUI.SetTurnText($"SP不足: {selectedCard.cardName} には {selectedCard.spCost} SP 必要");
+                _selectedCardIndices.Remove(cardIndex);
+                UpdateCardState();
+                return;
+            }
+
+            var selectedCard = _hand[cardIndex];
+            if (GetSelectedSpCost() + selectedCard.spCost > _playerUnit.CurrentSp)
+            {
+                var message = $"SP不足: {selectedCard.cardName} を追加できません";
+                _battleUI.SetTurnText(message);
+                _battleUI.AddBattleLog(message);
                 RefreshUi();
                 UpdateCardState();
                 return;
             }
 
-            RefreshUi();
-            _battleUI.SetCardsInteractable(false, _hand, _playerUnit.CurrentSp);
-            PerformAttack(_playerUnit, _enemyUnit, selectedCard.damage, selectedCard.cardName);
+            _selectedCardIndices.Add(cardIndex);
+            UpdateCardState();
+        }
 
-            if (selectedCard.exhaustAfterUse)
-            {
-                cardPool.Remove(selectedCard);
-            }
-
-            if (TryResolveBattleEnd())
+        public void ConfirmSelectedCards()
+        {
+            if (_state != BattleState.PlayerTurn || _selectedCardIndices.Count == 0)
             {
                 return;
             }
 
+            var selectedIndices = new List<int>(_selectedCardIndices);
+            _selectedCardIndices.Clear();
+
+            foreach (var cardIndex in selectedIndices)
+            {
+                if (cardIndex < 0 || cardIndex >= _hand.Count)
+                {
+                    continue;
+                }
+
+                var selectedCard = _hand[cardIndex];
+                if (!_playerUnit.SpendSp(selectedCard.spCost))
+                {
+                    continue;
+                }
+
+                RefreshUi();
+                _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は {selectedCard.cardName} を使用");
+                PerformAttack(_playerUnit, _enemyUnit, selectedCard.damage, selectedCard.cardName);
+
+                if (selectedCard.exhaustAfterUse)
+                {
+                    cardPool.Remove(selectedCard);
+                    _battleUI.AddBattleLog($"{selectedCard.cardName} は使い切りで消滅");
+                }
+
+                if (TryResolveBattleEnd())
+                {
+                    return;
+                }
+            }
+
             _state = BattleState.EnemyTurn;
             _battleUI.SetTurnText("敵のターンです");
+            _battleUI.AddBattleLog("敵のターン");
+            UpdateCardState();
             _enemyTurnCoroutine = StartCoroutine(ExecuteEnemyTurn());
         }
 
@@ -147,12 +192,18 @@ namespace AshenPath.Battle
         private void StartPlayerTurn(string turnMessage)
         {
             _state = BattleState.PlayerTurn;
+            _turnCount++;
+            _selectedCardIndices.Clear();
+            var previousSp = _playerUnit.CurrentSp;
             _playerUnit.RecoverSp(_playerUnit.SpRecoveryPerTurn);
             DrawHand();
             _battleUI.RefreshHand(_hand);
             _battleUI.SetTurnText(turnMessage);
+            _battleUI.SetTurnCount(_turnCount);
             RefreshUi();
             UpdateCardState();
+            var recoveredSp = _playerUnit.CurrentSp - previousSp;
+            _battleUI.AddBattleLog($"{_playerUnit.DisplayName} のターン: SP {recoveredSp} 回復");
         }
 
         private void DrawHand()
@@ -173,9 +224,11 @@ namespace AshenPath.Battle
 
         private void PerformAttack(BattleUnit attacker, BattleUnit defender, int damage, string attackName)
         {
-            defender.TakeDamage(damage);
+            var dealtDamage = defender.TakeDamage(damage);
             RefreshUi();
-            _battleUI.SetTurnText($"{attacker.DisplayName} の {attackName}！ {defender.DisplayName} に {damage} ダメージ");
+            var message = $"{attacker.DisplayName} の {attackName}！ {defender.DisplayName} に {dealtDamage} ダメージ";
+            _battleUI.SetTurnText(message);
+            _battleUI.AddBattleLog(message);
         }
 
         private bool TryResolveBattleEnd()
@@ -196,7 +249,10 @@ namespace AshenPath.Battle
             var resultMessage = _playerUnit.IsDead ? "敗北..." : "勝利！";
             _battleUI.SetResultText(resultMessage, true);
             _battleUI.SetTurnText("戦闘終了");
-            _battleUI.SetCardsInteractable(false, _hand, _playerUnit.CurrentSp);
+            _battleUI.AddBattleLog(resultMessage);
+            _battleUI.SetCardsInteractable(false, _hand, 0, _selectedCardIndices);
+            _battleUI.SetSelectedCards(_selectedCardIndices, _hand, _playerUnit.CurrentSp);
+            _battleUI.SetConfirmButtonState(false, 0);
             return true;
         }
 
@@ -208,7 +264,27 @@ namespace AshenPath.Battle
 
         private void UpdateCardState()
         {
-            _battleUI.SetCardsInteractable(_state == BattleState.PlayerTurn, _hand, _playerUnit.CurrentSp);
+            var remainingSp = Mathf.Max(0, _playerUnit.CurrentSp - GetSelectedSpCost());
+            _battleUI.SetCardsInteractable(_state == BattleState.PlayerTurn, _hand, remainingSp, _selectedCardIndices);
+            _battleUI.SetSelectedCards(_selectedCardIndices, _hand, _playerUnit.CurrentSp);
+            _battleUI.SetConfirmButtonState(_state == BattleState.PlayerTurn && _selectedCardIndices.Count > 0, GetSelectedSpCost());
+        }
+
+        private int GetSelectedSpCost()
+        {
+            var total = 0;
+            for (var i = 0; i < _selectedCardIndices.Count; i++)
+            {
+                var index = _selectedCardIndices[i];
+                if (index < 0 || index >= _hand.Count)
+                {
+                    continue;
+                }
+
+                total += Mathf.Max(0, _hand[index].spCost);
+            }
+
+            return total;
         }
     }
 }
