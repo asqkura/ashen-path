@@ -4,6 +4,8 @@ namespace AshenPath.Battle
 {
     public class BattleUnit
     {
+        private const int DefaultFreezeThreshold = 6;
+
         public BattleUnit(BattleUnitData data)
         {
             Data = data ?? new BattleUnitData();
@@ -49,6 +51,12 @@ namespace AshenPath.Battle
 
         public int PendingAttackMultiplierPercent { get; private set; } = 100;
 
+        public int FreezeStack { get; private set; }
+
+        public int FreezeThreshold => DefaultFreezeThreshold;
+
+        public bool WillSkipNextAction => FreezeStack >= FreezeThreshold;
+
         public void Reset()
         {
             CurrentHp = MaxHp;
@@ -60,6 +68,7 @@ namespace AshenPath.Battle
             SecondaryWeakElement = ElementType.None;
             ShieldCount = 0;
             BreakTurnsRemaining = 0;
+            FreezeStack = 0;
         }
 
         public int TakeDamage(int amount)
@@ -135,6 +144,23 @@ namespace AshenPath.Battle
             var percent = PendingAttackMultiplierPercent;
             PendingAttackMultiplierPercent = 100;
             return percent;
+        }
+
+        public int AddFreeze(int amount)
+        {
+            FreezeStack = Mathf.Max(0, FreezeStack + Mathf.Max(0, amount));
+            return FreezeStack;
+        }
+
+        public bool TryConsumeFrozenActionSkip()
+        {
+            if (!WillSkipNextAction)
+            {
+                return false;
+            }
+
+            FreezeStack = 0;
+            return true;
         }
 
         public void SetWeakElement(ElementType elementType)

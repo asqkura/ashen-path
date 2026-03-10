@@ -13,12 +13,33 @@ namespace AshenPath.Battle
             private readonly Dictionary<ElementType, int> _turnElementDamageBonus = new();
             private readonly Dictionary<ElementType, int> _nextElementDamageMultiplierPercent = new();
             private readonly Dictionary<ElementType, int> _usedElementCounts = new();
+            private bool _nextCardHasRevelation;
 
             public int NextCardDamageBonus { get; set; }
 
             public int NextCardSpDiscount { get; set; }
 
             public int TurnWideSpDiscount { get; set; }
+
+            public bool PlayerLostHpThisTurn { get; private set; }
+
+            public void AddRevelation()
+            {
+                _nextCardHasRevelation = true;
+            }
+
+            public bool ConsumeRevelationForCard(bool cardHasBlessing)
+            {
+                var hasRevelation = _nextCardHasRevelation;
+                _nextCardHasRevelation = false;
+
+                if (!hasRevelation || !cardHasBlessing)
+                {
+                    return false;
+                }
+
+                return true;
+            }
 
             public int ConsumeDamageBonus(ElementType elementType)
             {
@@ -44,6 +65,17 @@ namespace AshenPath.Battle
                 {
                     total += elementDiscount;
                     _nextElementSpDiscount.Remove(elementType);
+                }
+
+                return total;
+            }
+
+            public int PeekSpDiscount(ElementType elementType)
+            {
+                var total = NextCardSpDiscount + TurnWideSpDiscount;
+                if (_nextElementSpDiscount.TryGetValue(elementType, out var elementDiscount))
+                {
+                    total += elementDiscount;
                 }
 
                 return total;
@@ -115,6 +147,11 @@ namespace AshenPath.Battle
                 return GetDictionaryValue(_usedElementCounts, elementType);
             }
 
+            public void MarkPlayerLostHpThisTurn()
+            {
+                PlayerLostHpThisTurn = true;
+            }
+
             private static int GetDictionaryValue(Dictionary<ElementType, int> dictionary, ElementType key)
             {
                 return dictionary.TryGetValue(key, out var value) ? value : 0;
@@ -127,6 +164,7 @@ namespace AshenPath.Battle
         private readonly BattleUnit _enemyUnit;
         private readonly Action<BattleUnit, BattleUnit, int, string, ElementType, int> _performAttack;
         private readonly Action _refreshUi;
+        private readonly Dictionary<ElementType, int> _battleElementDamageBonus = new();
 
         public BattleCardResolver(
             BattleUI battleUI,
@@ -144,16 +182,19 @@ namespace AshenPath.Battle
             _refreshUi = refreshUi;
         }
 
+        public void ResetBattleState()
+        {
+            _battleElementDamageBonus.Clear();
+        }
+
         public void ResolveCard(BattleCardData card, TurnEffectState effectState, int sequenceIndex)
         {
+            var blessingTriggered = effectState.ConsumeRevelationForCard(HasBlessingKeyword(card));
             effectState.RegisterCardUse(card.elementType);
-            var damageBonus = effectState.ConsumeDamageBonus(card.elementType);
+            var damageBonus = effectState.ConsumeDamageBonus(card.elementType) + GetBattleElementDamageBonus(card.elementType);
             var currentDamage = Mathf.Max(0, card.damage + damageBonus);
-            var extraShieldDamage = 0;
             var repeatEffects = new List<BattleCardEffectData>();
             var damageMultiplierPercent = effectState.ConsumeDamageMultiplierPercent(card.elementType);
-            var ignoreDefaultAttack = false;
-            var skipDamageIfNotBroken = false;
 
             if (card.effects != null)
             {
@@ -162,15 +203,6 @@ namespace AshenPath.Battle
                     var effect = card.effects[i];
                     switch (effect.effectType)
                     {
-                        case BattleCardEffectType.ExtraShieldDamage:
-                            extraShieldDamage += Mathf.Max(0, effect.value);
-                            break;
-                        case BattleCardEffectType.BonusDamageIfTargetBroken:
-                            if (_enemyUnit.IsBroken)
-                            {
-                                currentDamage += Mathf.Max(0, effect.value);
-                            }
-                            break;
                         case BattleCardEffectType.BonusDamageIfCardSequenceAtLeast:
                             if (sequenceIndex >= Mathf.Max(1, effect.value))
                             {
@@ -192,12 +224,6 @@ namespace AshenPath.Battle
 
             switch (card.id)
             {
-                case "neutral_finish":
-                    if (_enemyUnit.IsBroken)
-                    {
-                        damageMultiplierPercent *= 2;
-                    }
-                    break;
                 case "fire_ignition":
                     if (sequenceIndex >= 2)
                     {
@@ -211,13 +237,7 @@ namespace AshenPath.Battle
                     }
                     break;
                 case "fire_volcano":
-                    if (_enemyUnit.IsBroken)
-                    {
-                        currentDamage += 20;
-                    }
-                    break;
-                case "ice_avalanche":
-                    extraShieldDamage += Mathf.Max(0, _enemyUnit.ShieldCount);
+                    currentDamage += GetBattleElementDamageBonus(ElementType.Fire) * 2;
                     break;
                 case "wind_zephyr":
                     repeatEffects.Add(new BattleCardEffectData
@@ -227,12 +247,6 @@ namespace AshenPath.Battle
                         secondaryValue = Mathf.Max(0, effectState.GetUsedElementCount(ElementType.Wind) - 1)
                     });
                     break;
-                case "light_shine":
-                    if (_playerUnit.CurrentHp >= _playerUnit.MaxHp)
-                    {
-                        damageMultiplierPercent *= 2;
-                    }
-                    break;
                 case "light_judge":
                     currentDamage = _playerUnit.CurrentHp;
                     break;
@@ -240,27 +254,30 @@ namespace AshenPath.Battle
                     currentDamage = _deckRuntime.DiscardHandAndCount("dark_grim") * 5;
                     break;
                 case "dark_nox":
-                    if (_deckRuntime.Hand.Count == 1)
+                    if (effectState.PlayerLostHpThisTurn)
                     {
                         damageMultiplierPercent *= 3;
                     }
                     break;
                 case "dark_reaper":
-                    skipDamageIfNotBroken = true;
+                    if (effectState.PlayerLostHpThisTurn)
+                    {
+                        currentDamage += 18;
+                    }
+                    break;
+                case "dark_abyss":
+                    if (effectState.PlayerLostHpThisTurn)
+                    {
+                        currentDamage += 8;
+                    }
                     break;
             }
 
             currentDamage = Mathf.RoundToInt(currentDamage * (damageMultiplierPercent / 100f));
 
-            if (skipDamageIfNotBroken && !_enemyUnit.IsBroken)
+            if (currentDamage > 0)
             {
-                ignoreDefaultAttack = true;
-                _battleUI.AddBattleLog($"{card.cardName} は Break 中の敵にしか使えないぬめ");
-            }
-
-            if (!ignoreDefaultAttack && (currentDamage > 0 || (extraShieldDamage > 0 && card.elementType != ElementType.None)))
-            {
-                _performAttack(_playerUnit, _enemyUnit, currentDamage, card.cardName, card.elementType, extraShieldDamage);
+                _performAttack(_playerUnit, _enemyUnit, currentDamage, card.cardName, card.elementType, 0);
             }
             else
             {
@@ -282,7 +299,7 @@ namespace AshenPath.Battle
                 }
             }
 
-            ApplyPostCardEffects(card, effectState, currentDamage);
+            ApplyPostCardEffects(card, effectState, currentDamage, sequenceIndex, blessingTriggered);
             _refreshUi();
         }
 
@@ -318,7 +335,7 @@ namespace AshenPath.Battle
             }
         }
 
-        private void ApplyPostCardEffects(BattleCardData card, TurnEffectState effectState, int currentDamage)
+        private void ApplyPostCardEffects(BattleCardData card, TurnEffectState effectState, int currentDamage, int sequenceIndex, bool blessingTriggered)
         {
             if (card.effects != null)
             {
@@ -338,6 +355,10 @@ namespace AshenPath.Battle
                             break;
                         case BattleCardEffectType.SelfDamage:
                             var selfDamage = _playerUnit.TakeDamage(effect.value);
+                            if (selfDamage > 0)
+                            {
+                                effectState.MarkPlayerLostHpThisTurn();
+                            }
                             _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は反動で {selfDamage} ダメージ");
                             break;
                         case BattleCardEffectType.GainBarrier:
@@ -368,6 +389,8 @@ namespace AshenPath.Battle
                 }
             }
 
+            ApplyKeywordEffects(card, effectState, blessingTriggered);
+
             if (card.id == "dark_crow")
             {
                 effectState.AddNextElementDamageMultiplierPercent(ElementType.Dark, 150);
@@ -379,10 +402,6 @@ namespace AshenPath.Battle
                 case "neutral_draw":
                     _deckRuntime.DrawCardsIntoHand(2);
                     break;
-                case "fire_burn_up":
-                    effectState.AddTurnElementDamageBonus(ElementType.Fire, 4);
-                    _battleUI.AddBattleLog("このターンの炎カードが強化されたぬめ");
-                    break;
                 case "fire_ash":
                     var recoveredCard = _deckRuntime.ReturnLastExhaustedCardToHand();
                     if (recoveredCard != null)
@@ -390,53 +409,136 @@ namespace AshenPath.Battle
                         _battleUI.AddBattleLog($"{recoveredCard.cardName} が手札に戻ったぬめ");
                     }
                     break;
-                case "ice_freeze":
-                    _enemyUnit.SetPendingAttackMultiplierPercent(50);
-                    _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} の次の攻撃が半減するぬめ");
-                    break;
                 case "ice_crystal":
                     _deckRuntime.DrawCardsIntoHand(1);
-                    break;
-                case "wind_wind":
-                    _deckRuntime.DrawCardsIntoHand(1);
-                    break;
-                case "wind_breeze":
-                    _deckRuntime.DrawCardsIntoHand(2);
                     break;
                 case "wind_step":
                     effectState.TurnWideSpDiscount += 1;
                     _battleUI.AddBattleLog("このターンの手札の消費SPが下がったぬめ");
-                    break;
-                case "wind_cyclone":
-                    _deckRuntime.DrawCardsIntoHand(1);
                     break;
                 case "wind_feather":
                     if (_deckRuntime.DiscardFirstHandCardExcept("wind_feather"))
                     {
                         _battleUI.AddBattleLog("手札を1枚捨てたぬめ");
                     }
-                    _deckRuntime.DrawCardsIntoHand(3);
-                    break;
-                case "light_barrier":
-                    _battleUI.AddBattleLog("このターンは弱体を防ぐぬめ");
+                    _deckRuntime.DrawCardsIntoHand(2);
                     break;
                 case "light_sunlight":
                     var healFromDamage = Mathf.FloorToInt(Mathf.Max(0, currentDamage) * 0.5f);
                     var lifeSteal = _playerUnit.Heal(healFromDamage);
                     _battleUI.AddBattleLog($"{_playerUnit.DisplayName} はHPを {lifeSteal} 回復");
                     break;
-                case "dark_reaper":
-                    if (_enemyUnit.IsBroken)
+                case "dark_abyss":
+                    if (effectState.PlayerLostHpThisTurn)
                     {
-                        var hpToLose = Mathf.Max(0, _playerUnit.CurrentHp - 1);
-                        if (hpToLose > 0)
-                        {
-                            _playerUnit.TakeDamage(hpToLose);
-                            _battleUI.AddBattleLog($"{_playerUnit.DisplayName} のHPは 1 になったぬめ");
-                        }
+                        _deckRuntime.DrawCardsIntoHand(1);
+                        _battleUI.AddBattleLog("協約が満たされ、カードを1枚引いたぬめ");
                     }
                     break;
             }
+        }
+
+        private void ApplyKeywordEffects(BattleCardData card, TurnEffectState effectState, bool blessingTriggered)
+        {
+            if (card.keywords == null || card.keywords.Count == 0)
+            {
+                return;
+            }
+
+            if (TryGetKeywordValue(card, BattleCardKeywordType.Kindle, out var fireBonus))
+            {
+                AddBattleElementDamageBonus(ElementType.Fire, fireBonus);
+                _battleUI.AddBattleLog($"熾火が燃え上がり、炎カードが {fireBonus} 強くなったぬめ");
+            }
+
+            if (TryGetKeywordValue(card, BattleCardKeywordType.Freeze, out var freezeAmount))
+            {
+                var totalFreeze = _enemyUnit.AddFreeze(freezeAmount);
+                _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} に凍結 {freezeAmount} を付与 ({totalFreeze}/{_enemyUnit.FreezeThreshold})");
+            }
+
+            if (HasKeyword(card, BattleCardKeywordType.Revelation))
+            {
+                effectState.AddRevelation();
+                _battleUI.AddBattleLog("啓示が灯り、次の祝福が開くぬめ");
+            }
+
+            if (TryGetKeywordValue(card, BattleCardKeywordType.Blessing, out var blessAmount))
+            {
+                if (blessingTriggered)
+                {
+                    effectState.NextCardDamageBonus += blessAmount;
+                    _battleUI.AddBattleLog($"祝福が満ち、次のカードの威力が {blessAmount} 上がったぬめ");
+                }
+            }
+
+            if (HasKeyword(card, BattleCardKeywordType.Tailwind) && card.elementType == ElementType.Wind && effectState.GetUsedElementCount(ElementType.Wind) == 1)
+            {
+                _deckRuntime.DrawCardsIntoHand(1);
+                _battleUI.AddBattleLog("追風が吹き、カードを1枚引いたぬめ");
+            }
+        }
+
+        private int GetBattleElementDamageBonus(ElementType elementType)
+        {
+            return _battleElementDamageBonus.TryGetValue(elementType, out var value) ? value : 0;
+        }
+
+        private void AddBattleElementDamageBonus(ElementType elementType, int value)
+        {
+            if (value <= 0)
+            {
+                return;
+            }
+
+            _battleElementDamageBonus[elementType] = GetBattleElementDamageBonus(elementType) + value;
+        }
+
+        private static bool HasKeyword(BattleCardData card, BattleCardKeywordType keywordType)
+        {
+            if (card?.keywords == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < card.keywords.Count; i++)
+            {
+                var keyword = card.keywords[i];
+                if (keyword != null && keyword.keywordType == keywordType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasBlessingKeyword(BattleCardData card)
+        {
+            return TryGetKeywordValue(card, BattleCardKeywordType.Blessing, out _);
+        }
+
+        private static bool TryGetKeywordValue(BattleCardData card, BattleCardKeywordType keywordType, out int value)
+        {
+            value = 0;
+            if (card?.keywords == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < card.keywords.Count; i++)
+            {
+                var keyword = card.keywords[i];
+                if (keyword == null || keyword.keywordType != keywordType)
+                {
+                    continue;
+                }
+
+                value = keyword.value;
+                return true;
+            }
+
+            return false;
         }
 
         private static string GetElementLabel(ElementType elementType)

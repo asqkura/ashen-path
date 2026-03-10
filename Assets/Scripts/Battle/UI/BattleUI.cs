@@ -58,6 +58,7 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _playerSpText;
         private Image _playerSpFill;
         private TextMeshProUGUI _enemyNameText;
+        private TextMeshProUGUI _enemyIntentText;
         private TextMeshProUGUI _enemyHpText;
         private Image _enemyHpFill;
         private TextMeshProUGUI _logText;
@@ -92,6 +93,9 @@ namespace AshenPath.Battle
         private RectTransform _enemyActorRect;
         private Vector2 _enemyActorBasePosition;
         private Coroutine _enemyShakeCoroutine;
+        private RectTransform _playerActorRect;
+        private Vector2 _playerActorBasePosition;
+        private Coroutine _playerShakeCoroutine;
         private AudioSource _uiAudioSource;
         private AsyncOperationHandle<AudioClip> _cursorSeHandle;
         private bool _cursorSeHandleInitialized;
@@ -147,6 +151,9 @@ namespace AshenPath.Battle
             CreateArena(_battleContentRoot);
 
             var enemyPanel = CreateStatusPanel("EnemyPanel", _battleContentRoot, new Vector2(TopPanelMargin, -TopPanelMargin), EnemyPanelSize, new Vector2(0f, 1f), "EnemyName", out _enemyNameText);
+            _enemyIntentText = CreateText("EnemyIntentText", enemyPanel.transform, 20, TextAnchor.MiddleRight, new Color(0.98f, 0.88f, 0.62f, 1f));
+            _enemyIntentText.fontStyle = FontStyles.Bold;
+            ConfigureRect(_enemyIntentText.rectTransform, new Vector2(-PanelPadding, -PanelPadding - 2f), new Vector2(180f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
             _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, EnemyAccent, out _enemyHpText);
 
             var playerPanel = CreateStatusPanel("PlayerPanel", _battleContentRoot, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
@@ -176,7 +183,7 @@ namespace AshenPath.Battle
             if (_confirmButton != null)
             {
                 _confirmButton.onClick.RemoveAllListeners();
-                _confirmButton.onClick.AddListener(controller.ConfirmSelectedCards);
+                _confirmButton.onClick.AddListener(controller.EndPlayerTurn);
             }
 
             for (var i = 0; i < _deckCardButtons.Count; i++)
@@ -307,13 +314,12 @@ namespace AshenPath.Battle
             RefreshHoveredCardPreview();
         }
 
-        public void SetCardsInteractable(bool interactable, IReadOnlyList<BattleCardData> hand, int currentSp, IReadOnlyCollection<int> selectedIndices)
+        public void SetCardsInteractable(bool interactable, IReadOnlyList<BattleCardData> hand, IReadOnlyCollection<int> playableIndices)
         {
             for (var i = 0; i < _cardButtons.Count; i++)
             {
-                var isSelected = IsCardSelected(selectedIndices, i);
-                var canAfford = hand != null && i < hand.Count && currentSp >= hand[i].spCost;
-                _cardButtons[i].interactable = interactable && _cardButtons[i].gameObject.activeSelf && (canAfford || isSelected);
+                var canPlay = ContainsIndex(playableIndices, i);
+                _cardButtons[i].interactable = interactable && _cardButtons[i].gameObject.activeSelf && canPlay;
                 _cardBackgrounds[i].color = _cardButtons[i].interactable ? GetCardBaseColor(hand, i) : CardDisabledColor;
                 _cardTitleTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.78f, 0.78f, 0.78f, 1f);
                 _cardDescriptionTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.72f, 0.72f, 0.72f, 1f);
@@ -350,7 +356,7 @@ namespace AshenPath.Battle
             }
         }
 
-        public void SetConfirmButtonState(bool enabled, int selectedSpCost)
+        public void SetConfirmButtonState(bool enabled, string label)
         {
             if (_confirmButton == null || _confirmButtonText == null)
             {
@@ -359,7 +365,15 @@ namespace AshenPath.Battle
 
             _confirmButton.interactable = enabled;
             _confirmButton.gameObject.SetActive(true);
-            _confirmButtonText.text = enabled ? $"確定 ({selectedSpCost} SP)" : "確定";
+            _confirmButtonText.text = string.IsNullOrWhiteSpace(label) ? "ターン終了" : label;
+        }
+
+        public void SetEnemyIntent(string message)
+        {
+            if (_enemyIntentText != null)
+            {
+                _enemyIntentText.text = message;
+            }
         }
 
         public void SetBattleScreenVisible(bool visible)
@@ -446,6 +460,25 @@ namespace AshenPath.Battle
             StartCoroutine(AnimateDamagePopup(_enemyActorRect, damage, elementType));
         }
 
+        public void PlayPlayerDamageEffect(int damage, ElementType elementType)
+        {
+            if (_playerActorRect == null || damage <= 0)
+            {
+                return;
+            }
+
+            PlayDamageSe();
+
+            if (_playerShakeCoroutine != null)
+            {
+                StopCoroutine(_playerShakeCoroutine);
+                _playerActorRect.anchoredPosition = _playerActorBasePosition;
+            }
+
+            _playerShakeCoroutine = StartCoroutine(ShakeRect(_playerActorRect, _playerActorBasePosition, 0.24f, 20f, false));
+            StartCoroutine(AnimateDamagePopup(_playerActorRect, damage, elementType));
+        }
+
         private static bool IsCardSelected(IReadOnlyCollection<int> selectedIndices, int index)
         {
             if (selectedIndices == null)
@@ -474,6 +507,24 @@ namespace AshenPath.Battle
             foreach (var selectedCardId in selectedCardIds)
             {
                 if (selectedCardId == cardId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsIndex(IReadOnlyCollection<int> indices, int index)
+        {
+            if (indices == null)
+            {
+                return false;
+            }
+
+            foreach (var candidate in indices)
+            {
+                if (candidate == index)
                 {
                     return true;
                 }
@@ -603,7 +654,8 @@ namespace AshenPath.Battle
 
             _enemyActorRect = CreateActor(arena.transform, "EnemyActor", new Vector2(-420f, 30f), EnemyAccent, "ENEMY").GetComponent<RectTransform>();
             _enemyActorBasePosition = _enemyActorRect.anchoredPosition;
-            CreateActor(arena.transform, "PlayerActor", new Vector2(420f, 30f), PlayerAccent, "PLAYER");
+            _playerActorRect = CreateActor(arena.transform, "PlayerActor", new Vector2(420f, 30f), PlayerAccent, "PLAYER").GetComponent<RectTransform>();
+            _playerActorBasePosition = _playerActorRect.anchoredPosition;
 
         }
 
@@ -882,7 +934,7 @@ namespace AshenPath.Battle
             return normalized[..(maxLength - 3)] + "...";
         }
 
-        private static string FormatKeywords(IReadOnlyList<string> keywords)
+        private static string FormatKeywords(IReadOnlyList<BattleCardKeywordData> keywords)
         {
             if (keywords == null || keywords.Count == 0)
             {
@@ -892,15 +944,37 @@ namespace AshenPath.Battle
             var formatted = new List<string>(keywords.Count);
             for (var i = 0; i < keywords.Count; i++)
             {
-                if (string.IsNullOrWhiteSpace(keywords[i]))
+                if (keywords[i] == null)
                 {
                     continue;
                 }
 
-                formatted.Add($"【{keywords[i].Replace(" ", "：")}】");
+                formatted.Add(FormatKeyword(keywords[i]));
             }
 
             return string.Join(" ", formatted);
+        }
+
+        private static string FormatKeyword(BattleCardKeywordData keyword)
+        {
+            var label = keyword.keywordType switch
+            {
+                BattleCardKeywordType.Kindle => "熾火",
+                BattleCardKeywordType.Freeze => "凍結",
+                BattleCardKeywordType.Tailwind => "追風",
+                BattleCardKeywordType.Revelation => "啓示",
+                BattleCardKeywordType.Blessing => "祝福",
+                BattleCardKeywordType.Covenant => "協約",
+                BattleCardKeywordType.Exhaust => "消滅",
+                _ => keyword.keywordType.ToString()
+            };
+
+            if (keyword.value > 0)
+            {
+                return $"【{label}：{keyword.value}】";
+            }
+
+            return $"【{label}】";
         }
 
         private string GetCostLabel(BattleCardData card)
@@ -1289,7 +1363,7 @@ namespace AshenPath.Battle
             fillImage.fillAmount = Mathf.MoveTowards(fillImage.fillAmount, Mathf.Clamp01(targetFill), Time.unscaledDeltaTime * BarFillAnimationSpeed);
         }
 
-        private IEnumerator ShakeRect(RectTransform rectTransform, Vector2 basePosition, float duration, float magnitude)
+        private IEnumerator ShakeRect(RectTransform rectTransform, Vector2 basePosition, float duration, float magnitude, bool isEnemy = true)
         {
             var elapsed = 0f;
             while (elapsed < duration)
@@ -1302,7 +1376,14 @@ namespace AshenPath.Battle
             }
 
             rectTransform.anchoredPosition = basePosition;
-            _enemyShakeCoroutine = null;
+            if (isEnemy)
+            {
+                _enemyShakeCoroutine = null;
+            }
+            else
+            {
+                _playerShakeCoroutine = null;
+            }
         }
 
         private IEnumerator AnimateDamagePopup(RectTransform targetRect, int damage, ElementType elementType)

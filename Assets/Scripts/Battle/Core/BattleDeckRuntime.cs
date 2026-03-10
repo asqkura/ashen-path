@@ -12,6 +12,8 @@ namespace AshenPath.Battle
         private readonly List<BattleCardData> _exhaustedPile = new();
         private readonly List<BattleCardData> _hand = new();
 
+        public int HandLimit { get; set; } = int.MaxValue;
+
         public IReadOnlyList<BattleCardData> AllCards => _allCards;
 
         public IReadOnlyList<BattleCardData> Hand => _hand;
@@ -105,7 +107,7 @@ namespace AshenPath.Battle
         public void RefillHand(int handSize)
         {
             var drawCount = Mathf.Max(0, handSize - _hand.Count);
-            DrawCardsIntoHand(drawCount);
+            DrawCardsIntoHand(drawCount, handSize);
         }
 
         public void FinalizePlayedCard(BattleCardData card)
@@ -117,13 +119,7 @@ namespace AshenPath.Battle
                 return;
             }
 
-            if (card.id == "dark_abyss")
-            {
-                _hand.Add(card);
-                return;
-            }
-
-            if (card.exhaustAfterUse)
+            if (HasKeyword(card, BattleCardKeywordType.Exhaust))
             {
                 _exhaustedPile.Add(card);
                 return;
@@ -141,8 +137,18 @@ namespace AshenPath.Battle
 
         public void DrawCardsIntoHand(int count)
         {
+            DrawCardsIntoHand(count, HandLimit);
+        }
+
+        public void DrawCardsIntoHand(int count, int maxHandSize)
+        {
             for (var i = 0; i < Mathf.Max(0, count); i++)
             {
+                if (_hand.Count >= Mathf.Max(0, maxHandSize))
+                {
+                    break;
+                }
+
                 if (_drawPile.Count == 0)
                 {
                     if (_discardPile.Count == 0)
@@ -218,6 +224,24 @@ namespace AshenPath.Battle
                 var swapIndex = Random.Range(0, i + 1);
                 (cards[i], cards[swapIndex]) = (cards[swapIndex], cards[i]);
             }
+        }
+
+        private static bool HasKeyword(BattleCardData card, BattleCardKeywordType keywordType)
+        {
+            if (card?.keywords == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < card.keywords.Count; i++)
+            {
+                if (card.keywords[i] != null && card.keywords[i].keywordType == keywordType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

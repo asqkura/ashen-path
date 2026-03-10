@@ -21,6 +21,17 @@ namespace AshenPath.Battle
         BonusDamageIfHandCountAtMost
     }
 
+    public enum BattleCardKeywordType
+    {
+        Kindle,
+        Freeze,
+        Tailwind,
+        Revelation,
+        Blessing,
+        Covenant,
+        Exhaust
+    }
+
     [Serializable]
     public class BattleCardEffectData
     {
@@ -30,16 +41,22 @@ namespace AshenPath.Battle
     }
 
     [Serializable]
+    public class BattleCardKeywordData
+    {
+        public BattleCardKeywordType keywordType;
+        public int value;
+    }
+
+    [Serializable]
     public class BattleCardData
     {
         public string id = "attack";
         public string cardName = "Strike";
         public string description = "Basic attack.";
-        public List<string> keywords = new();
+        public List<BattleCardKeywordData> keywords = new();
         public int damage = 8;
         public int spCost = 1;
         public ElementType elementType = ElementType.None;
-        public bool exhaustAfterUse;
         public List<BattleCardEffectData> effects = new();
     }
 
@@ -52,16 +69,22 @@ namespace AshenPath.Battle
     }
 
     [Serializable]
+    public class BattleCardKeywordJson
+    {
+        public string keywordType;
+        public int value;
+    }
+
+    [Serializable]
     public class BattleCardJson
     {
         public string id;
         public string cardName;
         public string description;
-        public List<string> keywords = new();
+        public List<BattleCardKeywordJson> keywords = new();
         public int damage;
         public int spCost;
         public string elementType;
-        public bool exhaustAfterUse;
         public List<BattleCardEffectJson> effects = new();
     }
 

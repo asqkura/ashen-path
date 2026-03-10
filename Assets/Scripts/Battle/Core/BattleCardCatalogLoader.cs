@@ -41,11 +41,10 @@ namespace AshenPath.Battle
                 id = string.IsNullOrWhiteSpace(source.id) ? source.cardName : source.id,
                 cardName = source.cardName,
                 description = source.description,
-                keywords = source.keywords ?? new List<string>(),
+                keywords = ConvertKeywords(source.keywords),
                 damage = source.damage,
                 spCost = source.spCost,
                 elementType = ParseElementType(source.elementType),
-                exhaustAfterUse = source.exhaustAfterUse,
                 effects = ConvertEffects(source.effects)
             };
         }
@@ -77,6 +76,32 @@ namespace AshenPath.Battle
             return effects;
         }
 
+        private static List<BattleCardKeywordData> ConvertKeywords(List<BattleCardKeywordJson> source)
+        {
+            var keywords = new List<BattleCardKeywordData>();
+            if (source == null)
+            {
+                return keywords;
+            }
+
+            for (var i = 0; i < source.Count; i++)
+            {
+                var keyword = source[i];
+                if (keyword == null || string.IsNullOrWhiteSpace(keyword.keywordType))
+                {
+                    continue;
+                }
+
+                keywords.Add(new BattleCardKeywordData
+                {
+                    keywordType = ParseKeywordType(keyword.keywordType),
+                    value = keyword.value
+                });
+            }
+
+            return keywords;
+        }
+
         private static ElementType ParseElementType(string elementType)
         {
             if (Enum.TryParse(elementType, true, out ElementType parsed))
@@ -95,6 +120,16 @@ namespace AshenPath.Battle
             }
 
             throw new InvalidOperationException($"不明なカード効果ぬめ: {effectType}");
+        }
+
+        private static BattleCardKeywordType ParseKeywordType(string keywordType)
+        {
+            if (Enum.TryParse(keywordType, true, out BattleCardKeywordType parsed))
+            {
+                return parsed;
+            }
+
+            throw new InvalidOperationException($"不明なキーワードぬめ: {keywordType}");
         }
     }
 }
