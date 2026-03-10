@@ -199,16 +199,6 @@ namespace AshenPath.Battle
                 yield break;
             }
 
-            if (_enemyUnit.IsBroken)
-            {
-                _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} は Break 中で行動不能ぬめ！");
-                _enemyUnit.EndBreak();
-                RefreshUi();
-                _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} のシールドが回復したぬめ");
-                StartPlayerTurn("プレイヤーのターンです");
-                yield break;
-            }
-
             switch (ChooseEnemyAction())
             {
                 case EnemyAction.Attack:
@@ -239,9 +229,6 @@ namespace AshenPath.Battle
 
             _playerUnit.Reset();
             _enemyUnit.Reset();
-            var weakElements = GetRandomWeakElements();
-            _enemyUnit.SetWeakElements(weakElements.primary, weakElements.secondary);
-            _enemyUnit.SetShieldCount(3);
             _deckRuntime.BeginBattle();
 
             _battleUI.SetBattleScreenVisible(true);
@@ -271,27 +258,7 @@ namespace AshenPath.Battle
 
         private void PerformAttack(BattleUnit attacker, BattleUnit defender, int damage, string attackName, ElementType elementType, int extraShieldDamage = 0)
         {
-            var wasBroken = defender.IsBroken;
-            if (defender.TryBreakShield(elementType))
-            {
-                _battleUI.AddBattleLog("弱点を突いてシールドを削ったぬめ！");
-                for (var i = 0; i < extraShieldDamage; i++)
-                {
-                    if (!defender.TryBreakShield(elementType))
-                    {
-                        break;
-                    }
-
-                    _battleUI.AddBattleLog("追撃でシールドを削ったぬめ！");
-                }
-
-                if (defender.IsBroken)
-                {
-                    _battleUI.AddBattleLog($"{defender.DisplayName} は Break 状態ぬめ！");
-                }
-            }
-
-            var dealtDamage = wasBroken ? damage * 2 : damage;
+            var dealtDamage = damage;
             dealtDamage = defender.TakeDamage(dealtDamage, out var absorbedByBarrier);
             RefreshUi();
             if (defender == _enemyUnit && dealtDamage > 0)
@@ -422,18 +389,6 @@ namespace AshenPath.Battle
             }
 
             return total;
-        }
-
-        private static (ElementType primary, ElementType secondary) GetRandomWeakElements()
-        {
-            var primary = (ElementType)UnityEngine.Random.Range(1, 6);
-            var secondary = primary;
-            while (secondary == primary)
-            {
-                secondary = (ElementType)UnityEngine.Random.Range(1, 6);
-            }
-
-            return (primary, secondary);
         }
 
         private void FinalizePlayedCard(BattleCardData card)

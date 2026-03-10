@@ -35,7 +35,6 @@ namespace AshenPath.Battle
         private static readonly Color EnemyAccent = new(0.76f, 0.32f, 0.32f, 1f);
         private static readonly Color PlayerAccent = new(0.32f, 0.72f, 0.58f, 1f);
         private static readonly Color SpAccent = new(0.36f, 0.64f, 0.96f, 1f);
-        private static readonly Color ShieldAccent = new(0.42f, 0.7f, 0.98f, 1f);
         private static readonly Color TextColor = new(0.95f, 0.96f, 0.98f, 1f);
         private static readonly Color ArenaColor = new(0.12f, 0.13f, 0.16f, 0.92f);
         private static readonly Color CardColor = new(0.92f, 0.92f, 0.92f, 1f);
@@ -61,9 +60,6 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _enemyNameText;
         private TextMeshProUGUI _enemyHpText;
         private Image _enemyHpFill;
-        private TextMeshProUGUI _enemyWeakText;
-        private TextMeshProUGUI _enemyShieldText;
-        private Image _enemyShieldFill;
         private TextMeshProUGUI _logText;
         private TextMeshProUGUI _turnCountText;
         private Button _confirmButton;
@@ -112,7 +108,6 @@ namespace AshenPath.Battle
         private float _playerHpTargetFill = 1f;
         private float _playerSpTargetFill = 1f;
         private float _enemyHpTargetFill = 1f;
-        private float _enemyShieldTargetFill = 1f;
         private int _hoveredCardIndex = -1;
 
         public void Build()
@@ -152,11 +147,7 @@ namespace AshenPath.Battle
             CreateArena(_battleContentRoot);
 
             var enemyPanel = CreateStatusPanel("EnemyPanel", _battleContentRoot, new Vector2(TopPanelMargin, -TopPanelMargin), EnemyPanelSize, new Vector2(0f, 1f), "EnemyName", out _enemyNameText);
-            _enemyWeakText = CreateText("EnemyWeakText", enemyPanel.transform, 20, TextAnchor.MiddleRight, new Color(0.98f, 0.88f, 0.62f, 1f));
-            _enemyWeakText.fontStyle = FontStyles.Bold;
-            ConfigureRect(_enemyWeakText.rectTransform, new Vector2(-PanelPadding, -PanelPadding - 2f), new Vector2(180f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
             _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, EnemyAccent, out _enemyHpText);
-            _enemyShieldFill = CreateStatusBarSection(enemyPanel.transform, "ShieldSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, ShieldAccent, out _enemyShieldText);
 
             var playerPanel = CreateStatusPanel("PlayerPanel", _battleContentRoot, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
             _playerHpFill = CreateStatusBarSection(playerPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, PlayerAccent, out _playerHpText);
@@ -207,27 +198,12 @@ namespace AshenPath.Battle
             AnimateBarFill(_playerHpFill, _playerHpTargetFill);
             AnimateBarFill(_playerSpFill, _playerSpTargetFill);
             AnimateBarFill(_enemyHpFill, _enemyHpTargetFill);
-            AnimateBarFill(_enemyShieldFill, _enemyShieldTargetFill);
         }
 
         public void RefreshUnits(BattleUnit player, BattleUnit enemy)
         {
             UpdateUnitDisplay(player, _playerNameText, _playerHpText, _playerHpFill);
             UpdateUnitDisplay(enemy, _enemyNameText, _enemyHpText, _enemyHpFill);
-            if (_enemyWeakText != null)
-            {
-                _enemyWeakText.text = $"Weak: {GetWeakElementLabel(enemy.PrimaryWeakElement, enemy.SecondaryWeakElement)}";
-            }
-
-            if (_enemyShieldText != null)
-            {
-                _enemyShieldText.text = enemy.IsBroken ? "BREAK" : $"{enemy.ShieldCount} / {enemy.MaxShieldCount}";
-            }
-
-            if (_enemyShieldFill != null)
-            {
-                _enemyShieldTargetFill = enemy.MaxShieldCount > 0 ? enemy.ShieldCount / (float)enemy.MaxShieldCount : 0f;
-            }
         }
 
         public void RefreshPlayerSp(int currentSp, int maxSp)

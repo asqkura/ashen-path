@@ -41,7 +41,7 @@ namespace AshenPath.Battle
 
         public int MaxShieldCount { get; private set; }
 
-        public bool IsBroken => BreakTurnsRemaining > 0;
+        public bool IsBroken => false;
 
         public int BreakTurnsRemaining { get; private set; }
 
@@ -58,7 +58,7 @@ namespace AshenPath.Battle
             PendingAttackMultiplierPercent = 100;
             PrimaryWeakElement = Data.weakElement;
             SecondaryWeakElement = ElementType.None;
-            ShieldCount = MaxShieldCount;
+            ShieldCount = 0;
             BreakTurnsRemaining = 0;
         }
 
@@ -151,31 +151,20 @@ namespace AshenPath.Battle
 
         public void SetShieldCount(int shieldCount)
         {
-            MaxShieldCount = Mathf.Max(0, shieldCount);
-            ShieldCount = MaxShieldCount;
+            MaxShieldCount = 0;
+            ShieldCount = 0;
             BreakTurnsRemaining = 0;
         }
 
         public bool TryBreakShield(ElementType attackElement)
         {
-            if (IsBroken || ShieldCount <= 0 || attackElement == ElementType.None || !IsWeakTo(attackElement))
-            {
-                return false;
-            }
-
-            ShieldCount = Mathf.Max(0, ShieldCount - 1);
-            if (ShieldCount == 0)
-            {
-                BreakTurnsRemaining = 1;
-            }
-
-            return true;
+            return false;
         }
 
         public void EndBreak()
         {
             BreakTurnsRemaining = 0;
-            ShieldCount = MaxShieldCount;
+            ShieldCount = 0;
         }
 
         private bool IsWeakTo(ElementType attackElement)
