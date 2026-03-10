@@ -30,6 +30,7 @@ namespace AshenPath.Battle
         }
 
         [SerializeField] private float enemyTurnDelay = 0.9f;
+        [SerializeField] private float playerCardActionInterval = 0.35f;
         [SerializeField] private BattleUnitData playerUnitData = new()
         {
             displayName = "Player",
@@ -46,13 +47,13 @@ namespace AshenPath.Battle
         };
         [SerializeField] private List<BattleCardData> cardPool = new()
         {
-            new BattleCardData { cardName = "Slash", description = "斬撃で 8 ダメージ", damage = 8, spCost = 2, elementType = ElementType.None },
-            new BattleCardData { cardName = "Pierce", description = "貫通攻撃で 7 ダメージ", damage = 7, spCost = 1, elementType = ElementType.Wind },
-            new BattleCardData { cardName = "Smash", description = "重い一撃で 10 ダメージ", damage = 10, spCost = 3, elementType = ElementType.Fire },
-            new BattleCardData { cardName = "Twin Fang", description = "素早い連撃で 6 ダメージ", damage = 6, spCost = 1, elementType = ElementType.Wind },
-            new BattleCardData { cardName = "Moon Edge", description = "深い斬り込みで 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Water },
-            new BattleCardData { cardName = "Ash Burst", description = "灰の爆ぜで 11 ダメージ", damage = 11, spCost = 4, elementType = ElementType.Fire, exhaustAfterUse = true },
-            new BattleCardData { cardName = "Needle", description = "細い突きで 5 ダメージ", damage = 5, spCost = 1, elementType = ElementType.Water },
+            new BattleCardData { cardName = "アタック", description = "無属性で 8 ダメージ", damage = 8, spCost = 2, elementType = ElementType.None },
+            new BattleCardData { cardName = "ウィンド", description = "風で 7 ダメージ", damage = 7, spCost = 1, elementType = ElementType.Wind },
+            new BattleCardData { cardName = "ファイア", description = "火で 10 ダメージ", damage = 10, spCost = 3, elementType = ElementType.Fire },
+            new BattleCardData { cardName = "ウィンド+", description = "風で 6 ダメージ", damage = 6, spCost = 1, elementType = ElementType.Wind },
+            new BattleCardData { cardName = "ウォーター", description = "水で 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Water },
+            new BattleCardData { cardName = "ファイア+", description = "火で 11 ダメージ。使い切り", damage = 11, spCost = 4, elementType = ElementType.Fire, exhaustAfterUse = true },
+            new BattleCardData { cardName = "ウォーター+", description = "水で 5 ダメージ", damage = 5, spCost = 1, elementType = ElementType.Water },
         };
 
         private BattleState _state;
@@ -60,6 +61,7 @@ namespace AshenPath.Battle
         private BattleUnit _enemyUnit;
         private BattleUI _battleUI;
         private Coroutine _enemyTurnCoroutine;
+        private Coroutine _playerActionCoroutine;
         private int _turnCount;
         private readonly List<BattleCardData> _hand = new();
         private readonly List<int> _selectedCardIndices = new();
@@ -126,41 +128,8 @@ namespace AshenPath.Battle
 
             var selectedIndices = new List<int>(_selectedCardIndices);
             _selectedCardIndices.Clear();
-
-            foreach (var cardIndex in selectedIndices)
-            {
-                if (cardIndex < 0 || cardIndex >= _hand.Count)
-                {
-                    continue;
-                }
-
-                var selectedCard = _hand[cardIndex];
-                if (!_playerUnit.SpendSp(selectedCard.spCost))
-                {
-                    continue;
-                }
-
-                RefreshUi();
-                _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は {selectedCard.cardName} を使用");
-                PerformAttack(_playerUnit, _enemyUnit, selectedCard.damage, selectedCard.cardName, selectedCard.elementType);
-
-                if (selectedCard.exhaustAfterUse)
-                {
-                    cardPool.Remove(selectedCard);
-                    _battleUI.AddBattleLog($"{selectedCard.cardName} は使い切りで消滅");
-                }
-
-                if (TryResolveBattleEnd())
-                {
-                    return;
-                }
-            }
-
-            _state = BattleState.EnemyTurn;
-            _battleUI.SetTurnText("敵のターンです");
-            _battleUI.AddBattleLog("敵のターン");
             UpdateCardState();
-            _enemyTurnCoroutine = StartCoroutine(ExecuteEnemyTurn());
+            _playerActionCoroutine = StartCoroutine(ResolvePlayerCards(selectedIndices));
         }
 
         private IEnumerator ExecuteEnemyTurn()
@@ -260,6 +229,52 @@ namespace AshenPath.Battle
             _battleUI.AddBattleLog(message);
         }
 
+        private IEnumerator ResolvePlayerCards(IReadOnlyList<int> selectedIndices)
+        {
+            for (var i = 0; i < selectedIndices.Count; i++)
+            {
+                var cardIndex = selectedIndices[i];
+                if (cardIndex < 0 || cardIndex >= _hand.Count)
+                {
+                    continue;
+                }
+
+                var selectedCard = _hand[cardIndex];
+                if (!_playerUnit.SpendSp(selectedCard.spCost))
+                {
+                    continue;
+                }
+
+                RefreshUi();
+                _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は {selectedCard.cardName} を使用");
+                PerformAttack(_playerUnit, _enemyUnit, selectedCard.damage, selectedCard.cardName, selectedCard.elementType);
+
+                if (selectedCard.exhaustAfterUse)
+                {
+                    cardPool.Remove(selectedCard);
+                    _battleUI.AddBattleLog($"{selectedCard.cardName} は使い切りで消滅");
+                }
+
+                if (TryResolveBattleEnd())
+                {
+                    _playerActionCoroutine = null;
+                    yield break;
+                }
+
+                if (i < selectedIndices.Count - 1)
+                {
+                    yield return new WaitForSeconds(playerCardActionInterval);
+                }
+            }
+
+            _playerActionCoroutine = null;
+            _state = BattleState.EnemyTurn;
+            _battleUI.SetTurnText("敵のターンです");
+            _battleUI.AddBattleLog("敵のターン");
+            UpdateCardState();
+            _enemyTurnCoroutine = StartCoroutine(ExecuteEnemyTurn());
+        }
+
         private bool TryResolveBattleEnd()
         {
             if (!_playerUnit.IsDead && !_enemyUnit.IsDead)
@@ -273,6 +288,12 @@ namespace AshenPath.Battle
             {
                 StopCoroutine(_enemyTurnCoroutine);
                 _enemyTurnCoroutine = null;
+            }
+
+            if (_playerActionCoroutine != null)
+            {
+                StopCoroutine(_playerActionCoroutine);
+                _playerActionCoroutine = null;
             }
 
             var resultMessage = _playerUnit.IsDead ? "敗北..." : "勝利！";

@@ -12,22 +12,29 @@ namespace AshenPath.Battle
         private const float HoverLiftLerpSpeed = 14f;
 
         private RectTransform _rectTransform;
+        private RectTransform _visualTarget;
         private Quaternion _targetRotation = Quaternion.identity;
         private bool _isPointerInside;
+        private Action _pointerEnterAction;
         private float _targetHoverOffsetY;
         private float _currentHoverOffsetY;
-        private Action _pointerEnterAction;
 
         private void Awake()
         {
             _rectTransform = GetComponent<RectTransform>();
+            _visualTarget = _rectTransform;
         }
 
         private void Update()
         {
-            transform.localRotation = Quaternion.Lerp(transform.localRotation, _targetRotation, Time.unscaledDeltaTime * RotationLerpSpeed);
+            if (_visualTarget == null)
+            {
+                return;
+            }
+
+            _visualTarget.localRotation = Quaternion.Lerp(_visualTarget.localRotation, _targetRotation, Time.unscaledDeltaTime * RotationLerpSpeed);
             _currentHoverOffsetY = Mathf.Lerp(_currentHoverOffsetY, _targetHoverOffsetY, Time.unscaledDeltaTime * HoverLiftLerpSpeed);
-            transform.localPosition = new Vector3(0f, _currentHoverOffsetY, 0f);
+            _visualTarget.localPosition = new Vector3(0f, _currentHoverOffsetY, 0f);
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -61,13 +68,26 @@ namespace AshenPath.Battle
             _targetRotation = Quaternion.identity;
             _targetHoverOffsetY = 0f;
             _currentHoverOffsetY = 0f;
-            transform.localRotation = Quaternion.identity;
-            transform.localPosition = Vector3.zero;
+            if (_visualTarget != null)
+            {
+                _visualTarget.localRotation = Quaternion.identity;
+                _visualTarget.localPosition = Vector3.zero;
+            }
         }
 
         public void BindPointerEnterAction(Action pointerEnterAction)
         {
             _pointerEnterAction = pointerEnterAction;
+        }
+
+        public void BindVisualTarget(RectTransform visualTarget)
+        {
+            _visualTarget = visualTarget != null ? visualTarget : _rectTransform;
+            if (_visualTarget != null)
+            {
+                _visualTarget.localRotation = Quaternion.identity;
+                _visualTarget.localPosition = Vector3.zero;
+            }
         }
 
         private void UpdateRotation(PointerEventData eventData)

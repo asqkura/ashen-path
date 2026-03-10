@@ -22,8 +22,12 @@ namespace AshenPath.Battle
         private const float StatusSectionSpacing = 18f;
         private const float TopPanelMargin = 32f;
         private const float SelectedCardHop = 18f;
+        private const float BarFillAnimationSpeed = 2.8f;
+        private const float CursorSeCooldown = 0.12f;
         private const string CursorSeAddress = "Assets/Audios/SE/cursor.mp3";
         private const string CursorSeGuid = "54db76d7baca3e84d8ade6f541a9f026";
+        private const string DamageSeAddress = "Assets/Audios/SE/damage.mp3";
+        private const string DamageSeGuid = "06aa2d0e4b3e1ae489cf29f1b91b7062";
         private static readonly Color BackgroundColor = new(0.08f, 0.09f, 0.12f, 1f);
         private static readonly Color PanelColor = new(0.14f, 0.16f, 0.2f, 0.92f);
         private static readonly Color EnemyAccent = new(0.76f, 0.32f, 0.32f, 1f);
@@ -77,6 +81,17 @@ namespace AshenPath.Battle
         private bool _cursorSeLoadRequested;
         private AsyncOperationHandle<IList<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation>> _cursorSeLocationHandle;
         private bool _cursorSeLocationHandleInitialized;
+        private AsyncOperationHandle<AudioClip> _damageSeHandle;
+        private bool _damageSeHandleInitialized;
+        private bool _damageSeLoadRequested;
+        private AsyncOperationHandle<IList<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation>> _damageSeLocationHandle;
+        private bool _damageSeLocationHandleInitialized;
+        private int _pendingDamageSePlayCount;
+        private float _lastCursorSePlayTime = -10f;
+        private float _playerHpTargetFill = 1f;
+        private float _playerSpTargetFill = 1f;
+        private float _enemyHpTargetFill = 1f;
+        private float _enemyShieldTargetFill = 1f;
 
         public void Build()
         {
@@ -145,6 +160,14 @@ namespace AshenPath.Battle
             }
         }
 
+        private void Update()
+        {
+            AnimateBarFill(_playerHpFill, _playerHpTargetFill);
+            AnimateBarFill(_playerSpFill, _playerSpTargetFill);
+            AnimateBarFill(_enemyHpFill, _enemyHpTargetFill);
+            AnimateBarFill(_enemyShieldFill, _enemyShieldTargetFill);
+        }
+
         public void RefreshUnits(BattleUnit player, BattleUnit enemy)
         {
             UpdateUnitDisplay(player, _playerNameText, _playerHpText, _playerHpFill);
@@ -161,14 +184,14 @@ namespace AshenPath.Battle
 
             if (_enemyShieldFill != null)
             {
-                _enemyShieldFill.fillAmount = enemy.MaxShieldCount > 0 ? enemy.ShieldCount / (float)enemy.MaxShieldCount : 0f;
+                _enemyShieldTargetFill = enemy.MaxShieldCount > 0 ? enemy.ShieldCount / (float)enemy.MaxShieldCount : 0f;
             }
         }
 
         public void RefreshPlayerSp(int currentSp, int maxSp)
         {
             _playerSpText.text = $"SP {currentSp} / {maxSp}";
-            _playerSpFill.fillAmount = maxSp > 0 ? currentSp / (float)maxSp : 0f;
+            _playerSpTargetFill = maxSp > 0 ? currentSp / (float)maxSp : 0f;
         }
 
         public void SetTurnText(string message)
@@ -312,6 +335,8 @@ namespace AshenPath.Battle
                 return;
             }
 
+            PlayDamageSe();
+
             if (_enemyShakeCoroutine != null)
             {
                 StopCoroutine(_enemyShakeCoroutine);
@@ -397,7 +422,17 @@ namespace AshenPath.Battle
         {
             nameText.text = unit.DisplayName;
             hpText.text = $"HP {unit.CurrentHp} / {unit.MaxHp}";
-            hpFill.fillAmount = unit.CurrentHp / (float)unit.MaxHp;
+            var targetFill = unit.CurrentHp / (float)unit.MaxHp;
+            if (hpFill == _playerHpFill)
+            {
+                _playerHpTargetFill = targetFill;
+                return;
+            }
+
+            if (hpFill == _enemyHpFill)
+            {
+                _enemyHpTargetFill = targetFill;
+            }
         }
 
         private Image CreateStatusBarSection(Transform parent, string sectionName, Vector2 anchoredPosition, Vector2 size, Color fillColor, string label, out TextMeshProUGUI valueText)
@@ -481,30 +516,33 @@ namespace AshenPath.Battle
                 ConfigureRect(cardRootRect, new Vector2(x, 0f), new Vector2(cardWidth, cardHeight), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
                 var button = CreateCardButton(cardRoot.transform, Vector2.zero, new Vector2(cardWidth, cardHeight), true);
+                var visual = CreateCardVisual(button.transform, new Vector2(cardWidth, cardHeight));
                 _cardButtons.Add(button);
                 _cardRects.Add(cardRootRect);
                 _cardAnchoredPositions.Add(new Vector2(x, 0f));
-                _cardBackgrounds.Add(button.GetComponent<Image>());
+                _cardBackgrounds.Add(visual);
 
-                var title = CreateText("Title", button.transform, 28, TextAnchor.UpperLeft, DarkTextColor);
+                button.targetGraphic = visual;
+
+                var title = CreateText("Title", visual.transform, 28, TextAnchor.UpperLeft, DarkTextColor);
                 ConfigureRect(title.rectTransform, new Vector2(18f, -18f), new Vector2(cardWidth - 36f, 34f), new Vector2(0f, 1f), new Vector2(0f, 1f));
                 title.fontStyle = FontStyles.Bold;
                 title.textWrappingMode = TextWrappingModes.Normal;
                 title.overflowMode = TextOverflowModes.Truncate;
                 _cardTitleTexts.Add(title);
 
-                var elementText = CreateText("Element", button.transform, 18, TextAnchor.MiddleLeft, DarkTextColor);
+                var elementText = CreateText("Element", visual.transform, 18, TextAnchor.MiddleRight, DarkTextColor);
                 elementText.fontStyle = FontStyles.Bold;
-                ConfigureRect(elementText.rectTransform, new Vector2(18f, -52f), new Vector2(72f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(elementText.rectTransform, new Vector2(-18f, -18f), new Vector2(72f, 24f), new Vector2(1f, 1f), new Vector2(1f, 1f));
                 _cardElementTexts.Add(elementText);
 
-                var cost = CreateText("Cost", button.transform, 20, TextAnchor.UpperRight, DarkTextColor);
-                ConfigureRect(cost.rectTransform, new Vector2(-18f, -18f), new Vector2(96f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+                var cost = CreateText("Cost", visual.transform, 20, TextAnchor.UpperLeft, DarkTextColor);
+                ConfigureRect(cost.rectTransform, new Vector2(18f, -52f), new Vector2(96f, 28f), new Vector2(0f, 1f), new Vector2(0f, 1f));
                 cost.fontStyle = FontStyles.Bold;
                 _cardCostTexts.Add(cost);
 
-                var description = CreateText("Description", button.transform, 22, TextAnchor.UpperLeft, DarkTextColor);
-                ConfigureRect(description.rectTransform, new Vector2(18f, -86f), new Vector2(cardWidth - 36f, 108f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                var description = CreateText("Description", visual.transform, 22, TextAnchor.UpperLeft, DarkTextColor);
+                ConfigureRect(description.rectTransform, new Vector2(18f, -92f), new Vector2(cardWidth - 36f, 102f), new Vector2(0f, 1f), new Vector2(0f, 1f));
                 description.textWrappingMode = TextWrappingModes.Normal;
                 description.overflowMode = TextOverflowModes.Truncate;
                 _cardDescriptionTexts.Add(description);
@@ -513,6 +551,7 @@ namespace AshenPath.Battle
                 if (parallaxEffect != null)
                 {
                     parallaxEffect.BindPointerEnterAction(PlayCursorHoverSe);
+                    parallaxEffect.BindVisualTarget(visual.rectTransform);
                 }
             }
         }
@@ -573,14 +612,11 @@ namespace AshenPath.Battle
             buttonObject.transform.SetParent(parent, false);
 
             var image = buttonObject.GetComponent<Image>();
-            image.color = CardColor;
-            image.sprite = GetRoundedPanelSprite();
-            image.type = Image.Type.Sliced;
+            image.color = new Color(1f, 1f, 1f, 0f);
+            image.raycastTarget = true;
 
             var outline = buttonObject.GetComponent<Outline>();
-            outline.effectColor = new Color(0.26f, 0.19f, 0.1f, 0.95f);
-            outline.effectDistance = new Vector2(4f, -4f);
-            outline.useGraphicAlpha = true;
+            outline.enabled = false;
 
             var button = buttonObject.GetComponent<Button>();
             var colors = button.colors;
@@ -599,6 +635,26 @@ namespace AshenPath.Battle
             ConfigureRect(image.rectTransform, anchoredPosition, size, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
             return button;
+        }
+
+        private Image CreateCardVisual(Transform parent, Vector2 size)
+        {
+            var visualObject = new GameObject("CardVisual", typeof(Image), typeof(Outline));
+            visualObject.transform.SetParent(parent, false);
+
+            var image = visualObject.GetComponent<Image>();
+            image.color = CardColor;
+            image.sprite = GetRoundedPanelSprite();
+            image.type = Image.Type.Sliced;
+            image.raycastTarget = false;
+
+            var outline = visualObject.GetComponent<Outline>();
+            outline.effectColor = new Color(0.26f, 0.19f, 0.1f, 0.95f);
+            outline.effectDistance = new Vector2(4f, -4f);
+            outline.useGraphicAlpha = true;
+
+            ConfigureRect(image.rectTransform, Vector2.zero, size, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            return image;
         }
 
         private TextMeshProUGUI CreateText(string textName, Transform parent, int fontSize, TextAnchor alignment, Color color)
@@ -667,11 +723,17 @@ namespace AshenPath.Battle
                 return;
             }
 
+            if (Time.unscaledTime - _lastCursorSePlayTime < CursorSeCooldown)
+            {
+                return;
+            }
+
             if (_cursorSeHandleInitialized && _cursorSeHandle.IsValid())
             {
                 if (_cursorSeHandle.Status == AsyncOperationStatus.Succeeded && _cursorSeHandle.Result != null)
                 {
                     _uiAudioSource.PlayOneShot(_cursorSeHandle.Result);
+                    _lastCursorSePlayTime = Time.unscaledTime;
                 }
 
                 return;
@@ -699,6 +761,46 @@ namespace AshenPath.Battle
             };
         }
 
+        private void PlayDamageSe()
+        {
+            if (_uiAudioSource == null)
+            {
+                return;
+            }
+
+            if (_damageSeHandleInitialized && _damageSeHandle.IsValid())
+            {
+                if (_damageSeHandle.Status == AsyncOperationStatus.Succeeded && _damageSeHandle.Result != null)
+                {
+                    PlayDamageSeClip(1);
+                }
+
+                return;
+            }
+
+            _damageSeHandleInitialized = false;
+            _pendingDamageSePlayCount++;
+
+            if (_damageSeLoadRequested)
+            {
+                return;
+            }
+
+            _damageSeLoadRequested = true;
+            _damageSeLocationHandle = Addressables.LoadResourceLocationsAsync(DamageSeAddress, typeof(AudioClip));
+            _damageSeLocationHandle.Completed += handle =>
+            {
+                _damageSeLocationHandleInitialized = true;
+                if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null && handle.Result.Count > 0)
+                {
+                    LoadDamageSeFromKey(DamageSeAddress);
+                    return;
+                }
+
+                LoadDamageSeFromKey(DamageSeGuid);
+            };
+        }
+
         private void LoadCursorSeFromKey(object key)
         {
             _cursorSeHandle = Addressables.LoadAssetAsync<AudioClip>(key);
@@ -709,8 +811,38 @@ namespace AshenPath.Battle
                 if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null && _uiAudioSource != null)
                 {
                     _uiAudioSource.PlayOneShot(handle.Result);
+                    _lastCursorSePlayTime = Time.unscaledTime;
                 }
             };
+        }
+
+        private void LoadDamageSeFromKey(object key)
+        {
+            _damageSeHandle = Addressables.LoadAssetAsync<AudioClip>(key);
+            _damageSeHandle.Completed += handle =>
+            {
+                _damageSeHandleInitialized = true;
+                _damageSeLoadRequested = false;
+                if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null && _uiAudioSource != null)
+                {
+                    PlayDamageSeClip(_pendingDamageSePlayCount);
+                }
+
+                _pendingDamageSePlayCount = 0;
+            };
+        }
+
+        private void PlayDamageSeClip(int playCount)
+        {
+            if (_uiAudioSource == null || !_damageSeHandle.IsValid() || _damageSeHandle.Result == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < Mathf.Max(1, playCount); i++)
+            {
+                _uiAudioSource.PlayOneShot(_damageSeHandle.Result);
+            }
         }
 
         private void OnDestroy()
@@ -725,8 +857,31 @@ namespace AshenPath.Battle
                 Addressables.Release(_cursorSeLocationHandle);
             }
 
+            if (_damageSeHandleInitialized && _damageSeHandle.IsValid())
+            {
+                Addressables.Release(_damageSeHandle);
+            }
+
+            if (_damageSeLocationHandleInitialized && _damageSeLocationHandle.IsValid())
+            {
+                Addressables.Release(_damageSeLocationHandle);
+            }
+
             _cursorSeHandleInitialized = false;
             _cursorSeLocationHandleInitialized = false;
+            _damageSeHandleInitialized = false;
+            _damageSeLocationHandleInitialized = false;
+            _pendingDamageSePlayCount = 0;
+        }
+
+        private static void AnimateBarFill(Image fillImage, float targetFill)
+        {
+            if (fillImage == null)
+            {
+                return;
+            }
+
+            fillImage.fillAmount = Mathf.MoveTowards(fillImage.fillAmount, Mathf.Clamp01(targetFill), Time.unscaledDeltaTime * BarFillAnimationSpeed);
         }
 
         private IEnumerator ShakeRect(RectTransform rectTransform, Vector2 basePosition, float duration, float magnitude)

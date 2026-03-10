@@ -15,6 +15,11 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: da1e8d69470251340b2c637374deabc4
   m_SerializeEntries:
+  - m_GUID: 06aa2d0e4b3e1ae489cf29f1b91b7062
+    m_Address: Assets/Audios/SE/damage.mp3
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 54db76d7baca3e84d8ade6f541a9f026
     m_Address: Cursor
     m_ReadOnly: 0
