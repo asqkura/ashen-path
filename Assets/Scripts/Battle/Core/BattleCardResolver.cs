@@ -211,10 +211,24 @@ namespace AshenPath.Battle
                 for (var i = 0; i < card.effects.Count; i++)
                 {
                     var effect = card.effects[i];
+                    if (!IsConditionMet(effect.conditionType, blessingTriggered, effectState))
+                    {
+                        continue;
+                    }
+
                     switch (effect.effectType)
                     {
+                        case BattleCardEffectType.BonusDamage:
+                            currentDamage += Mathf.Max(0, effect.value);
+                            break;
                         case BattleCardEffectType.BonusDamageIfCardSequenceAtLeast:
                             if (sequenceIndex >= Mathf.Max(1, effect.value))
+                            {
+                                currentDamage += Mathf.Max(0, effect.secondaryValue);
+                            }
+                            break;
+                        case BattleCardEffectType.BonusDamageIfCardSequenceEquals:
+                            if (sequenceIndex == Mathf.Max(1, effect.value))
                             {
                                 currentDamage += Mathf.Max(0, effect.secondaryValue);
                             }
@@ -224,6 +238,9 @@ namespace AshenPath.Battle
                             {
                                 currentDamage += Mathf.Max(0, effect.secondaryValue);
                             }
+                            break;
+                        case BattleCardEffectType.MultiplyDamagePercent:
+                            damageMultiplierPercent = Mathf.RoundToInt(damageMultiplierPercent * (Mathf.Max(100, effect.value) / 100f));
                             break;
                         case BattleCardEffectType.MultiplyDamageIfCardSequenceAtLeast:
                             if (sequenceIndex >= Mathf.Max(1, effect.value))
@@ -235,18 +252,6 @@ namespace AshenPath.Battle
                             if (_playerUnit.CurrentHp * 100 <= _playerUnit.MaxHp * Mathf.Max(0, effect.value))
                             {
                                 damageMultiplierPercent = Mathf.RoundToInt(damageMultiplierPercent * (Mathf.Max(100, effect.secondaryValue) / 100f));
-                            }
-                            break;
-                        case BattleCardEffectType.MultiplyDamageIfPlayerLostHpThisTurn:
-                            if (effectState.PlayerLostHpThisTurn)
-                            {
-                                damageMultiplierPercent = Mathf.RoundToInt(damageMultiplierPercent * (Mathf.Max(100, effect.value) / 100f));
-                            }
-                            break;
-                        case BattleCardEffectType.BonusDamageIfPlayerLostHpThisTurn:
-                            if (effectState.PlayerLostHpThisTurn)
-                            {
-                                currentDamage += Mathf.Max(0, effect.value);
                             }
                             break;
                         case BattleCardEffectType.DiscardHandDamage:
@@ -262,12 +267,6 @@ namespace AshenPath.Battle
                             break;
                         case BattleCardEffectType.BonusDamageFromBattleElementBonus:
                             currentDamage += GetBattleElementDamageBonus(card.elementType) * Mathf.Max(0, effect.value);
-                            break;
-                        case BattleCardEffectType.BonusDamageIfBlessingTriggered:
-                            if (blessingTriggered)
-                            {
-                                currentDamage += Mathf.Max(0, effect.value);
-                            }
                             break;
                         case BattleCardEffectType.BonusDamageFromFreezeStack:
                             currentDamage += _enemyUnit.FreezeStack * Mathf.Max(0, effect.value);
@@ -366,6 +365,11 @@ namespace AshenPath.Battle
                 for (var i = 0; i < card.effects.Count; i++)
                 {
                     var effect = card.effects[i];
+                    if (!IsConditionMet(effect.conditionType, blessingTriggered, effectState))
+                    {
+                        continue;
+                    }
+
                     switch (effect.effectType)
                     {
                         case BattleCardEffectType.RecoverSp:
@@ -413,32 +417,18 @@ namespace AshenPath.Battle
                             _deckRuntime.DrawCardsIntoHand(Mathf.Max(0, effect.value));
                             _battleUI.AddBattleLog($"カードを {Mathf.Max(0, effect.value)} 枚引いたぬめ");
                             break;
-                        case BattleCardEffectType.DrawCardsIfPlayerLostHpThisTurn:
-                            if (effectState.PlayerLostHpThisTurn)
-                            {
-                                _deckRuntime.DrawCardsIntoHand(Mathf.Max(0, effect.value));
-                                _battleUI.AddBattleLog($"協約が満たされ、カードを {Mathf.Max(0, effect.value)} 枚引いたぬめ");
-                            }
-                            break;
-                        case BattleCardEffectType.HealIfBlessingTriggered:
-                            if (blessingTriggered)
-                            {
-                                var blessingHeal = _playerUnit.Heal(effect.value);
-                                _battleUI.AddBattleLog($"{_playerUnit.DisplayName} はHPを {blessingHeal} 回復");
-                            }
-                            break;
-                        case BattleCardEffectType.DrawCardsIfBlessingTriggered:
-                            if (blessingTriggered)
-                            {
-                                _deckRuntime.DrawCardsIntoHand(Mathf.Max(0, effect.value));
-                                _battleUI.AddBattleLog($"祝福が満ち、カードを {Mathf.Max(0, effect.value)} 枚引いたぬめ");
-                            }
-                            break;
                         case BattleCardEffectType.ConsumeEnemyFreezeStack:
                             if (effect.value > 0)
                             {
                                 var consumedFreeze = _enemyUnit.ConsumeFreezeStack();
                                 _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} の凍結 {consumedFreeze} を消費したぬめ");
+                            }
+                            break;
+                        case BattleCardEffectType.HealIfTargetKilled:
+                            if (_enemyUnit.IsDead)
+                            {
+                                var killHeal = _playerUnit.Heal(effect.value);
+                                _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は屍から力を吸い、HPを {killHeal} 回復");
                             }
                             break;
                     }
@@ -469,6 +459,13 @@ namespace AshenPath.Battle
                     if (_deckRuntime.DiscardFirstHandCardExcept("neutral_reload"))
                     {
                         _battleUI.AddBattleLog("手札を1枚捨てたぬめ");
+                    }
+                    _deckRuntime.DrawCardsIntoHand(2);
+                    break;
+                case "wind_replace":
+                    if (_deckRuntime.DiscardFirstHandCardExcept("wind_replace"))
+                    {
+                        _battleUI.AddBattleLog("手札を1枚入れ替えたぬめ");
                     }
                     _deckRuntime.DrawCardsIntoHand(2);
                     break;
@@ -601,6 +598,17 @@ namespace AshenPath.Battle
                 ElementType.Light => "光",
                 ElementType.Dark => "闇",
                 _ => "無"
+            };
+        }
+
+        private static bool IsConditionMet(BattleCardConditionType conditionType, bool blessingTriggered, TurnEffectState effectState)
+        {
+            return conditionType switch
+            {
+                BattleCardConditionType.None => true,
+                BattleCardConditionType.Blessing => blessingTriggered,
+                BattleCardConditionType.Covenant => effectState.PlayerLostHpThisTurn,
+                _ => true
             };
         }
     }

@@ -17,22 +17,20 @@ namespace AshenPath.Battle
         EnemyAttackDown,
         ExtraShieldDamage,
         BonusDamageIfTargetBroken,
+        BonusDamage,
         BonusDamageIfCardSequenceAtLeast,
+        BonusDamageIfCardSequenceEquals,
         BonusDamageIfHandCountAtMost,
+        MultiplyDamagePercent,
         MultiplyDamageIfCardSequenceAtLeast,
         MultiplyDamageIfPlayerHpAtMostPercent,
-        MultiplyDamageIfPlayerLostHpThisTurn,
-        BonusDamageIfPlayerLostHpThisTurn,
         DrawCards,
-        DrawCardsIfPlayerLostHpThisTurn,
         DiscardHandDamage,
         RepeatAttackPerUsedElement,
         BonusDamageFromBattleElementBonus,
-        BonusDamageIfBlessingTriggered,
-        HealIfBlessingTriggered,
-        DrawCardsIfBlessingTriggered,
         BonusDamageFromFreezeStack,
-        ConsumeEnemyFreezeStack
+        ConsumeEnemyFreezeStack,
+        HealIfTargetKilled
     }
 
     public enum BattleCardKeywordType
@@ -46,10 +44,18 @@ namespace AshenPath.Battle
         Exhaust
     }
 
+    public enum BattleCardConditionType
+    {
+        None,
+        Blessing,
+        Covenant
+    }
+
     [Serializable]
     public class BattleCardEffectData
     {
         public BattleCardEffectType effectType;
+        public BattleCardConditionType conditionType;
         public int value;
         public int secondaryValue;
     }
@@ -78,6 +84,7 @@ namespace AshenPath.Battle
     public class BattleCardEffectJson
     {
         public string effectType;
+        public string conditionType;
         public int value;
         public int secondaryValue;
     }

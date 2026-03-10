@@ -68,6 +68,7 @@ namespace AshenPath.Battle
                 effects.Add(new BattleCardEffectData
                 {
                     effectType = ParseEffectType(effect.effectType),
+                    conditionType = ParseConditionType(effect.conditionType),
                     value = effect.value,
                     secondaryValue = effect.secondaryValue
                 });
@@ -130,6 +131,21 @@ namespace AshenPath.Battle
             }
 
             throw new InvalidOperationException($"不明なキーワードぬめ: {keywordType}");
+        }
+
+        private static BattleCardConditionType ParseConditionType(string conditionType)
+        {
+            if (string.IsNullOrWhiteSpace(conditionType))
+            {
+                return BattleCardConditionType.None;
+            }
+
+            if (Enum.TryParse(conditionType, true, out BattleCardConditionType parsed))
+            {
+                return parsed;
+            }
+
+            throw new InvalidOperationException($"不明な効果条件ぬめ: {conditionType}");
         }
     }
 }

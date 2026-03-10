@@ -3,7 +3,7 @@
     {
       "id": "ashen_beast",
       "unitData": {
-        "displayName": "Ashen Beast",
+        "displayName": "灰燼獣",
         "maxHp": 52,
         "attackPower": 8,
         "maxSp": 0,
@@ -14,7 +14,7 @@
         {
           "actionType": "Attack",
           "intentLabel": "予告: 通常攻撃 8",
-          "attackName": "Claw",
+          "attackName": "裂爪",
           "baseWeight": 24,
           "lowHpBonusWeight": 0,
           "chargedBonusWeight": 0,
@@ -26,7 +26,7 @@
         {
           "actionType": "HeavyAttack",
           "intentLabel": "予告: 強攻撃 14",
-          "attackName": "Heavy Claw",
+          "attackName": "暴爪",
           "baseWeight": 18,
           "lowHpBonusWeight": 10,
           "chargedBonusWeight": 18,
@@ -50,7 +50,7 @@
         {
           "actionType": "Flurry",
           "intentLabel": "予告: 連撃 6x2",
-          "attackName": "Twin Claw",
+          "attackName": "双爪",
           "baseWeight": 14,
           "lowHpBonusWeight": 10,
           "chargedBonusWeight": 14,

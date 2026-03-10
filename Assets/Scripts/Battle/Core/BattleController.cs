@@ -538,52 +538,52 @@ namespace AshenPath.Battle
             _deckPresets.Clear();
             _deckPresets.Add(CreateDeckPreset(
                 "starter_blaze",
-                "炎の切り札",
-                "炎を育てて大技で締める素直な高火力ぬめ。",
+                "灰都の残火",
+                "熾火を育て、最後は獄炎で焼き切るぬめ。",
                 ElementType.Fire,
-                "fire_heat", "fire_ember", "fire_burn_up", "fire_spark_flare", "fire_backdraft",
-                "fire_blaze", "fire_flare", "fire_inferno", "fire_volcano", "fire_caldera",
-                "neutral_chain", "neutral_brave", "neutral_draw", "wind_step", "dark_bloodletter"));
+                "fire_heat", "fire_ember", "fire_kindle_pile", "fire_spark_flare", "fire_backdraft",
+                "fire_ash_run", "fire_blaze", "fire_flare", "fire_inferno", "fire_volcano",
+                "fire_caldera", "fire_cremation", "neutral_chain", "neutral_brave", "dark_bloodletter"));
             _deckPresets.Add(CreateDeckPreset(
                 "frost_lock",
-                "氷の拘束",
-                "凍結を積んで敵行動を止め、最後に落とす制御寄りぬめ。",
+                "白霜の棺",
+                "凍てつく拘束で時を奪い、静かに仕留めるぬめ。",
                 ElementType.Ice,
-                "ice_cold_mist", "ice_ice_edge", "ice_freeze", "ice_hush", "ice_frostbite",
-                "ice_ice_wall", "ice_crystal", "ice_glacia", "ice_icicle_fall", "ice_avalanche",
-                "neutral_draw", "neutral_brave", "light_protect", "light_shelter", "wind_step"));
+                "ice_cold_mist", "ice_ice_edge", "ice_freeze", "ice_hush", "ice_seal",
+                "ice_frostbite", "ice_thin_ice", "ice_crystal", "ice_glacia", "ice_shatterfrost",
+                "ice_icicle_fall", "ice_avalanche", "neutral_draw", "light_protect", "wind_step"));
             _deckPresets.Add(CreateDeckPreset(
                 "wind_loop",
-                "風の連打",
-                "手数とドローで回し続けて、連撃札を押し込むぬめ。",
+                "宵風の刃",
+                "宵風のように手を巡らせ、連撃で裂き続けるぬめ。",
                 ElementType.Wind,
-                "wind_wind", "wind_breeze", "wind_step", "wind_sway", "wind_gust",
-                "wind_aero", "wind_rapid", "wind_cyclone", "wind_feather", "wind_zephyr",
-                "wind_storm_call", "neutral_chain", "neutral_reload", "neutral_draw", "light_omen"));
+                "wind_wind", "wind_breeze", "wind_step", "wind_sway", "wind_replace",
+                "wind_gust", "wind_tail_chase", "wind_spiral", "wind_aero", "wind_rapid",
+                "wind_cyclone", "wind_feather", "wind_zephyr", "wind_storm_call", "light_omen"));
             _deckPresets.Add(CreateDeckPreset(
                 "light_reversal",
-                "光の反転",
-                "啓示から祝福札を繋いで回復しながら押し返すぬめ。",
+                "聖痕の灯",
+                "か細い光を繋ぎ、傷を癒やしながら反撃へ転じるぬめ。",
                 ElementType.Light,
-                "light_guide", "light_omen", "light_lumina", "light_shine", "light_ray",
-                "light_barrier", "light_protect", "light_shelter", "light_sunlight", "light_holy",
-                "light_seraph", "light_judge", "neutral_first_aid", "neutral_heal", "wind_breeze"));
+                "light_guide", "light_omen", "light_prayer", "light_lumina", "light_shine",
+                "light_ray", "light_echo", "light_barrier", "light_protect", "light_shelter",
+                "light_redemption", "light_sunlight", "light_holy", "light_seraph", "light_judge"));
             _deckPresets.Add(CreateDeckPreset(
                 "dark_gamble",
-                "闇の契約",
-                "HPを払いながら協約を踏んで、一気に叩き切る危険札ぬめ。",
+                "黒血の盟約",
+                "血を捧げて協約を満たし、禁じ手で叩き伏せるぬめ。",
                 ElementType.Dark,
-                "dark_sacrifice", "dark_bloodletter", "dark_crow", "dark_dark", "dark_grim",
-                "dark_pain_share", "dark_nox", "dark_abyss", "dark_night", "dark_reaper",
-                "dark_eclipse", "neutral_draw", "neutral_reload", "neutral_heal", "wind_step"));
+                "dark_sacrifice", "dark_bloodletter", "dark_forbidden", "dark_crow", "dark_dark",
+                "dark_grim", "dark_pain_share", "dark_nox", "dark_black_rain", "dark_abyss",
+                "dark_night", "dark_soul_eat", "dark_reaper", "neutral_reload", "wind_step"));
             _deckPresets.Add(CreateDeckPreset(
                 "balanced_path",
-                "混成の道",
-                "各属性の強い中核を拾った、扱いやすい試運転用ぬめ。",
+                "灰の旅路",
+                "各属性の力を継ぎ合わせた、試練を渡るための道ぬめ。",
                 ElementType.None,
-                "neutral_attack", "neutral_chain", "neutral_draw", "neutral_brave", "neutral_reload",
-                "neutral_first_aid", "fire_backdraft", "fire_caldera", "ice_hush", "ice_icicle_fall",
-                "wind_step", "wind_storm_call", "light_omen", "light_seraph", "dark_reaper"));
+                "neutral_attack", "neutral_chain", "neutral_setup", "neutral_draw", "neutral_brave",
+                "neutral_reload", "neutral_bandage", "neutral_follow_up", "fire_backdraft", "ice_hush",
+                "ice_icicle_fall", "wind_spiral", "wind_storm_call", "light_omen", "dark_reaper"));
 
             _selectedDeckPresetIndex = Mathf.Clamp(_selectedDeckPresetIndex, 0, Mathf.Max(0, _deckPresets.Count - 1));
         }
