@@ -3,61 +3,25 @@
     {
       "id": "neutral_attack",
       "cardName": "アタック",
-      "description": "無で 6 ダメージ",
-      "damage": 6,
+      "description": "敵単体に5ダメージを与える。",
+      "damage": 5,
       "spCost": 1,
       "elementType": "None",
       "exhaustAfterUse": false,
       "effects": []
     },
     {
-      "id": "neutral_slash",
-      "cardName": "スラッシュ",
-      "description": "無で 9 ダメージ",
-      "damage": 9,
-      "spCost": 2,
-      "elementType": "None",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "neutral_smash",
-      "cardName": "スマッシュ",
-      "description": "無で 13 ダメージ",
-      "damage": 13,
-      "spCost": 3,
-      "elementType": "None",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "neutral_guard_break",
-      "cardName": "ガードブレイク",
-      "description": "無で 5 ダメージ。シールド削り+1",
-      "damage": 5,
-      "spCost": 2,
-      "elementType": "None",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "ExtraShieldDamage",
-          "value": 1,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
       "id": "neutral_chain",
       "cardName": "チェイン",
-      "description": "無で 4 ダメージ。次のカードの威力+2",
-      "damage": 4,
+      "description": "敵単体に3ダメージを与える。次に使用するカードのダメージを+3する。",
+      "damage": 3,
       "spCost": 1,
       "elementType": "None",
       "exhaustAfterUse": false,
       "effects": [
         {
           "effectType": "BuffNextCardDamage",
-          "value": 2,
+          "value": 3,
           "secondaryValue": 0
         }
       ]
@@ -65,14 +29,40 @@
     {
       "id": "neutral_recover",
       "cardName": "リカバー",
-      "description": "SPを 1 回復",
+      "description": "【使い切り】SPを1回復する。",
+      "damage": 0,
+      "spCost": 0,
+      "elementType": "None",
+      "exhaustAfterUse": true,
+      "effects": [
+        {
+          "effectType": "RecoverSp",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "neutral_draw",
+      "cardName": "ドロー",
+      "description": "山札からカードを2枚引く。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "None",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "neutral_brave",
+      "cardName": "ブレイブ",
+      "description": "次に使用するカード1枚のSPコストを-1する（最小0）。",
       "damage": 0,
       "spCost": 1,
       "elementType": "None",
       "exhaustAfterUse": false,
       "effects": [
         {
-          "effectType": "RecoverSp",
+          "effectType": "DiscountNextCardSp",
           "value": 1,
           "secondaryValue": 0
         }
@@ -81,7 +71,7 @@
     {
       "id": "neutral_rush",
       "cardName": "ラッシュ",
-      "description": "無で 3 ダメージを 2 回",
+      "description": "敵単体に3ダメージを2回与える。",
       "damage": 0,
       "spCost": 2,
       "elementType": "None",
@@ -95,137 +85,63 @@
       ]
     },
     {
-      "id": "neutral_finish",
-      "cardName": "フィニッシュ",
-      "description": "無で 10 ダメージ。Break中ならさらに+10",
-      "damage": 10,
-      "spCost": 4,
-      "elementType": "None",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BonusDamageIfTargetBroken",
-          "value": 10,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "neutral_brave",
-      "cardName": "ブレイブ",
-      "description": "無で 4 ダメージ。次の無カードのSP-1",
+      "id": "neutral_guard_break",
+      "cardName": "ガードブレイク",
+      "description": "敵単体に4ダメージを与える。敵の【シールド】値を2減少させる。",
       "damage": 4,
       "spCost": 2,
       "elementType": "None",
       "exhaustAfterUse": false,
       "effects": [
         {
-          "effectType": "DiscountNextElementSp",
-          "value": 1,
+          "effectType": "ExtraShieldDamage",
+          "value": 2,
           "secondaryValue": 0
         }
       ]
     },
     {
-      "id": "neutral_tactics",
-      "cardName": "タクティクス",
-      "description": "次のカードの威力+4",
-      "damage": 0,
-      "spCost": 1,
+      "id": "neutral_smash",
+      "cardName": "スマッシュ",
+      "description": "敵単体に12ダメージを与える。",
+      "damage": 12,
+      "spCost": 3,
       "elementType": "None",
       "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BuffNextCardDamage",
-          "value": 4,
-          "secondaryValue": 0
-        }
-      ]
+      "effects": []
+    },
+    {
+      "id": "neutral_finish",
+      "cardName": "フィニッシュ",
+      "description": "敵単体に15ダメージを与える。対象が【Break】中ならダメージを2倍にする。",
+      "damage": 15,
+      "spCost": 3,
+      "elementType": "None",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "neutral_slash",
+      "cardName": "スラッシュ",
+      "description": "敵単体に8ダメージを与える。",
+      "damage": 8,
+      "spCost": 2,
+      "elementType": "None",
+      "exhaustAfterUse": false,
+      "effects": []
     },
     {
       "id": "fire_heat",
       "cardName": "ヒート",
-      "description": "炎で 5 ダメージ",
-      "damage": 5,
-      "spCost": 1,
-      "elementType": "Fire",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "fire_blaze",
-      "cardName": "ブレイズ",
-      "description": "炎で 8 ダメージ",
-      "damage": 8,
-      "spCost": 2,
-      "elementType": "Fire",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "fire_flare",
-      "cardName": "フレア",
-      "description": "炎で 12 ダメージ",
-      "damage": 12,
-      "spCost": 3,
-      "elementType": "Fire",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "fire_burn_up",
-      "cardName": "バーンアップ",
-      "description": "炎で 4 ダメージ。次の炎カードの威力+4",
+      "description": "敵単体に4ダメージを与える。次に使用する【炎】カードのダメージを+2する。",
       "damage": 4,
-      "spCost": 2,
+      "spCost": 1,
       "elementType": "Fire",
       "exhaustAfterUse": false,
       "effects": [
         {
           "effectType": "BuffNextElementDamage",
-          "value": 4,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "fire_magma_burst",
-      "cardName": "マグマバースト",
-      "description": "炎で 16 ダメージ。使い切り",
-      "damage": 16,
-      "spCost": 4,
-      "elementType": "Fire",
-      "exhaustAfterUse": true,
-      "effects": []
-    },
-    {
-      "id": "fire_ignition",
-      "cardName": "イグニッション",
-      "description": "炎で 8 ダメージ。2枚目以降ならさらに+4",
-      "damage": 8,
-      "spCost": 2,
-      "elementType": "Fire",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BonusDamageIfCardSequenceAtLeast",
           "value": 2,
-          "secondaryValue": 4
-        }
-      ]
-    },
-    {
-      "id": "fire_volcano",
-      "cardName": "ボルカノ",
-      "description": "炎で 14 ダメージ。Break中ならさらに+12",
-      "damage": 14,
-      "spCost": 5,
-      "elementType": "Fire",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BonusDamageIfTargetBroken",
-          "value": 12,
           "secondaryValue": 0
         }
       ]
@@ -233,8 +149,8 @@
     {
       "id": "fire_spark_flare",
       "cardName": "スパークフレア",
-      "description": "炎で 4 ダメージ。次の炎カードのSP-1",
-      "damage": 4,
+      "description": "敵単体に3ダメージを与える。次に使用する【炎】カードのSPコストを-1する。",
+      "damage": 3,
       "spCost": 1,
       "elementType": "Fire",
       "exhaustAfterUse": false,
@@ -247,103 +163,99 @@
       ]
     },
     {
-      "id": "fire_inferno",
-      "cardName": "インフェルノ",
-      "description": "炎で 14 ダメージ。反動 3",
-      "damage": 14,
-      "spCost": 4,
-      "elementType": "Fire",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "SelfDamage",
-          "value": 3,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "fire_cinder",
-      "cardName": "シンダー",
-      "description": "炎で 6 ダメージ。次のカードの威力+3",
-      "damage": 6,
+      "id": "fire_blaze",
+      "cardName": "ブレイズ",
+      "description": "敵単体に8ダメージを与える。",
+      "damage": 8,
       "spCost": 2,
       "elementType": "Fire",
       "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BuffNextCardDamage",
-          "value": 3,
-          "secondaryValue": 0
-        }
-      ]
+      "effects": []
+    },
+    {
+      "id": "fire_burn_up",
+      "cardName": "バーンアップ",
+      "description": "このターンの間、自身が使用するすべての【炎】カードのダメージを+4する。",
+      "damage": 0,
+      "spCost": 2,
+      "elementType": "Fire",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "fire_ignition",
+      "cardName": "イグニッション",
+      "description": "敵単体に5ダメージを与える。このターンに使用した2枚目以降のカードならダメージを2倍にする。",
+      "damage": 5,
+      "spCost": 1,
+      "elementType": "Fire",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "fire_flare",
+      "cardName": "フレア",
+      "description": "敵単体に15ダメージを与える。",
+      "damage": 15,
+      "spCost": 3,
+      "elementType": "Fire",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "fire_inferno",
+      "cardName": "インフェルノ",
+      "description": "敵単体に18ダメージを与える。自身のHPが最大値の半分以下ならダメージを1.5倍にする。",
+      "damage": 18,
+      "spCost": 4,
+      "elementType": "Fire",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "fire_ash",
+      "cardName": "アッシュ",
+      "description": "敵単体に10ダメージを与える。自身の墓地（または除外）にある【使い切り】カードを1枚手札に戻す。",
+      "damage": 10,
+      "spCost": 2,
+      "elementType": "Fire",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "fire_magma_burst",
+      "cardName": "マグマバースト",
+      "description": "【使い切り】敵単体に25ダメージを与える。",
+      "damage": 25,
+      "spCost": 4,
+      "elementType": "Fire",
+      "exhaustAfterUse": true,
+      "effects": []
+    },
+    {
+      "id": "fire_volcano",
+      "cardName": "ボルカノ",
+      "description": "敵単体に30ダメージを与える。対象が【Break】中ならダメージをさらに+20する。",
+      "damage": 30,
+      "spCost": 5,
+      "elementType": "Fire",
+      "exhaustAfterUse": false,
+      "effects": []
     },
     {
       "id": "ice_snow",
       "cardName": "スノウ",
-      "description": "氷で 5 ダメージ",
-      "damage": 5,
+      "description": "敵単体に4ダメージを与える。",
+      "damage": 4,
       "spCost": 1,
       "elementType": "Ice",
       "exhaustAfterUse": false,
       "effects": []
     },
     {
-      "id": "ice_frost",
-      "cardName": "フロスト",
-      "description": "氷で 8 ダメージ",
-      "damage": 8,
-      "spCost": 2,
-      "elementType": "Ice",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "ice_ice_edge",
-      "cardName": "アイスエッジ",
-      "description": "氷で 7 ダメージ。敵の次の攻撃-2",
-      "damage": 7,
-      "spCost": 2,
-      "elementType": "Ice",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "EnemyAttackDown",
-          "value": 2,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "ice_blizzard",
-      "cardName": "ブリザド",
-      "description": "氷で 11 ダメージ",
-      "damage": 11,
-      "spCost": 3,
-      "elementType": "Ice",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "ice_freeze",
-      "cardName": "フリーズ",
-      "description": "氷で 4 ダメージ。敵の次の攻撃-4",
-      "damage": 4,
-      "spCost": 2,
-      "elementType": "Ice",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "EnemyAttackDown",
-          "value": 4,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
       "id": "ice_cold_mist",
       "cardName": "コールドミスト",
-      "description": "シールドを 1 余分に削る",
+      "description": "敵の【シールド】値を2減少させる。",
       "damage": 0,
       "spCost": 1,
       "elementType": "Ice",
@@ -351,7 +263,85 @@
       "effects": [
         {
           "effectType": "ExtraShieldDamage",
-          "value": 1,
+          "value": 2,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "ice_ice_edge",
+      "cardName": "アイスエッジ",
+      "description": "敵単体に6ダメージを与える。敵の次ターンの攻撃力を-3する。",
+      "damage": 6,
+      "spCost": 1,
+      "elementType": "Ice",
+      "exhaustAfterUse": false,
+      "effects": [
+        {
+          "effectType": "EnemyAttackDown",
+          "value": 3,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "ice_frost",
+      "cardName": "フロスト",
+      "description": "敵単体に10ダメージを与える。",
+      "damage": 10,
+      "spCost": 2,
+      "elementType": "Ice",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "ice_freeze",
+      "cardName": "フリーズ",
+      "description": "敵単体に4ダメージを与える。敵が次に行う行動の最終ダメージを半減させる。",
+      "damage": 4,
+      "spCost": 2,
+      "elementType": "Ice",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "ice_ice_wall",
+      "cardName": "アイスウォール",
+      "description": "自身に【シールド】8を付与する。",
+      "damage": 0,
+      "spCost": 2,
+      "elementType": "Ice",
+      "exhaustAfterUse": false,
+      "effects": [
+        {
+          "effectType": "GainBarrier",
+          "value": 8,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "ice_blizzard",
+      "cardName": "ブリザド",
+      "description": "敵単体に14ダメージを与える。",
+      "damage": 14,
+      "spCost": 3,
+      "elementType": "Ice",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "ice_crystal",
+      "cardName": "クリスタル",
+      "description": "敵単体に10ダメージを与える。自身に【シールド】4を付与し、カードを1枚引く。",
+      "damage": 10,
+      "spCost": 3,
+      "elementType": "Ice",
+      "exhaustAfterUse": false,
+      "effects": [
+        {
+          "effectType": "GainBarrier",
+          "value": 4,
           "secondaryValue": 0
         }
       ]
@@ -359,30 +349,14 @@
     {
       "id": "ice_glacia",
       "cardName": "グレイシャ",
-      "description": "氷で 9 ダメージ。シールド削り+1",
-      "damage": 9,
+      "description": "敵単体に15ダメージを与える。敵の【シールド】値を4減少させる。",
+      "damage": 15,
       "spCost": 4,
       "elementType": "Ice",
       "exhaustAfterUse": false,
       "effects": [
         {
           "effectType": "ExtraShieldDamage",
-          "value": 1,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "ice_crystal",
-      "cardName": "クリスタル",
-      "description": "氷で 6 ダメージ。ガード 4",
-      "damage": 6,
-      "spCost": 3,
-      "elementType": "Ice",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "GainBarrier",
           "value": 4,
           "secondaryValue": 0
         }
@@ -391,44 +365,48 @@
     {
       "id": "ice_avalanche",
       "cardName": "アバランチ",
-      "description": "氷で 18 ダメージ。使い切り",
-      "damage": 18,
+      "description": "【使い切り】敵の【シールド】をすべて破壊し、20ダメージを与える。",
+      "damage": 20,
       "spCost": 5,
       "elementType": "Ice",
       "exhaustAfterUse": true,
       "effects": []
     },
     {
-      "id": "ice_ice_wall",
-      "cardName": "アイスウォール",
-      "description": "ガード 8",
-      "damage": 0,
-      "spCost": 2,
-      "elementType": "Ice",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "GainBarrier",
-          "value": 8,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "wind_gust",
-      "cardName": "ガスト",
-      "description": "風で 4 ダメージ",
-      "damage": 4,
+      "id": "wind_wind",
+      "cardName": "ウィンド",
+      "description": "敵単体に3ダメージを与える。山札からカードを1枚引く。",
+      "damage": 3,
       "spCost": 1,
       "elementType": "Wind",
       "exhaustAfterUse": false,
       "effects": []
     },
     {
-      "id": "wind_wind",
-      "cardName": "ウィンド",
-      "description": "風で 5 ダメージ",
+      "id": "wind_gust",
+      "cardName": "ガスト",
+      "description": "敵単体に5ダメージを与える。",
       "damage": 5,
+      "spCost": 1,
+      "elementType": "Wind",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "wind_breeze",
+      "cardName": "ブリーズ",
+      "description": "山札からカードを2枚引く。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "Wind",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "wind_step",
+      "cardName": "ステップ",
+      "description": "このターンの間、自身の手札にあるすべてのカードのSPコストを-1する（最小0）。",
+      "damage": 0,
       "spCost": 1,
       "elementType": "Wind",
       "exhaustAfterUse": false,
@@ -437,38 +415,17 @@
     {
       "id": "wind_aero",
       "cardName": "エアロ",
-      "description": "風で 8 ダメージ",
-      "damage": 8,
+      "description": "敵単体に9ダメージを与える。",
+      "damage": 9,
       "spCost": 2,
       "elementType": "Wind",
       "exhaustAfterUse": false,
       "effects": []
     },
     {
-      "id": "wind_breeze",
-      "cardName": "ブリーズ",
-      "description": "SPを 1 回復。次のカードのSP-1",
-      "damage": 0,
-      "spCost": 1,
-      "elementType": "Wind",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "RecoverSp",
-          "value": 1,
-          "secondaryValue": 0
-        },
-        {
-          "effectType": "DiscountNextCardSp",
-          "value": 1,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
       "id": "wind_rapid",
       "cardName": "ラピッド",
-      "description": "風で 3 ダメージを 2 回",
+      "description": "敵単体に5ダメージを2回与える。",
       "damage": 0,
       "spCost": 2,
       "elementType": "Wind",
@@ -476,7 +433,7 @@
       "effects": [
         {
           "effectType": "RepeatAttack",
-          "value": 3,
+          "value": 5,
           "secondaryValue": 2
         }
       ]
@@ -484,93 +441,75 @@
     {
       "id": "wind_cyclone",
       "cardName": "サイクロン",
-      "description": "風で 6 ダメージ。次のカードのSP-1",
-      "damage": 6,
+      "description": "敵単体に7ダメージを与える。山札からカードを1枚引く。",
+      "damage": 7,
       "spCost": 2,
       "elementType": "Wind",
       "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "DiscountNextCardSp",
-          "value": 1,
-          "secondaryValue": 0
-        }
-      ]
+      "effects": []
+    },
+    {
+      "id": "wind_feather",
+      "cardName": "フェザー",
+      "description": "自身の手札を1枚捨てる。山札からカードを3枚引く。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "Wind",
+      "exhaustAfterUse": false,
+      "effects": []
     },
     {
       "id": "wind_tempest",
       "cardName": "テンペスト",
-      "description": "風で 11 ダメージ",
-      "damage": 11,
+      "description": "敵単体に16ダメージを与える。",
+      "damage": 16,
       "spCost": 3,
       "elementType": "Wind",
       "exhaustAfterUse": false,
       "effects": []
     },
     {
-      "id": "wind_step",
-      "cardName": "ステップ",
-      "description": "次のカードのSP-1",
-      "damage": 0,
-      "spCost": 1,
-      "elementType": "Wind",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "DiscountNextCardSp",
-          "value": 1,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
       "id": "wind_zephyr",
       "cardName": "ゼファー",
-      "description": "風で 3 ダメージを 3 回",
-      "damage": 0,
-      "spCost": 4,
+      "description": "敵単体に5ダメージを与える。このターンに使用した【風】カードの枚数分、この効果を繰り返す。",
+      "damage": 5,
+      "spCost": 3,
       "elementType": "Wind",
       "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "RepeatAttack",
-          "value": 3,
-          "secondaryValue": 3
-        }
-      ]
+      "effects": []
     },
     {
-      "id": "wind_feather",
-      "cardName": "フェザー",
-      "description": "風で 4 ダメージ。SPを 1 回復",
-      "damage": 4,
-      "spCost": 1,
-      "elementType": "Wind",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "RecoverSp",
-          "value": 1,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "light_ray",
-      "cardName": "レイ",
-      "description": "光で 8 ダメージ",
-      "damage": 8,
+      "id": "light_light",
+      "cardName": "ライト",
+      "description": "敵単体に10ダメージを与える。",
+      "damage": 10,
       "spCost": 2,
       "elementType": "Light",
       "exhaustAfterUse": false,
       "effects": []
     },
     {
-      "id": "light_shine",
-      "cardName": "シャイン",
-      "description": "光で 6 ダメージ。HPを 3 回復",
-      "damage": 6,
-      "spCost": 2,
+      "id": "light_guide",
+      "cardName": "ガイド",
+      "description": "次に使用するカード1枚のダメージを+5する。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "Light",
+      "exhaustAfterUse": false,
+      "effects": [
+        {
+          "effectType": "BuffNextCardDamage",
+          "value": 5,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
+      "id": "light_lumina",
+      "cardName": "ルミナ",
+      "description": "敵単体に5ダメージを与える。自身のHPを3回復する。",
+      "damage": 5,
+      "spCost": 1,
       "elementType": "Light",
       "exhaustAfterUse": false,
       "effects": [
@@ -582,10 +521,20 @@
       ]
     },
     {
-      "id": "light_light",
-      "cardName": "ライト",
-      "description": "光で 8 ダメージ",
+      "id": "light_shine",
+      "cardName": "シャイン",
+      "description": "敵単体に8ダメージを与える。自身のHPが最大値ならダメージを2倍にする。",
       "damage": 8,
+      "spCost": 2,
+      "elementType": "Light",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "light_ray",
+      "cardName": "レイ",
+      "description": "敵単体に12ダメージを与える。",
+      "damage": 12,
       "spCost": 2,
       "elementType": "Light",
       "exhaustAfterUse": false,
@@ -594,7 +543,7 @@
     {
       "id": "light_heal_light",
       "cardName": "ヒールライト",
-      "description": "HPを 8 回復",
+      "description": "自身のHPを10回復する。",
       "damage": 0,
       "spCost": 2,
       "elementType": "Light",
@@ -602,41 +551,15 @@
       "effects": [
         {
           "effectType": "Heal",
-          "value": 8,
+          "value": 10,
           "secondaryValue": 0
         }
       ]
-    },
-    {
-      "id": "light_lumina",
-      "cardName": "ルミナ",
-      "description": "SPを 2 回復",
-      "damage": 0,
-      "spCost": 2,
-      "elementType": "Light",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "RecoverSp",
-          "value": 2,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "light_holy",
-      "cardName": "ホーリー",
-      "description": "光で 11 ダメージ",
-      "damage": 11,
-      "spCost": 3,
-      "elementType": "Light",
-      "exhaustAfterUse": false,
-      "effects": []
     },
     {
       "id": "light_barrier",
       "cardName": "バリア",
-      "description": "ガード 7",
+      "description": "自身に【シールド】5を付与する。このターン、自身へのデバフを無効化する。",
       "damage": 0,
       "spCost": 2,
       "elementType": "Light",
@@ -644,23 +567,7 @@
       "effects": [
         {
           "effectType": "GainBarrier",
-          "value": 7,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "light_guide",
-      "cardName": "ガイド",
-      "description": "次のカードの威力+3",
-      "damage": 0,
-      "spCost": 1,
-      "elementType": "Light",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BuffNextCardDamage",
-          "value": 3,
+          "value": 5,
           "secondaryValue": 0
         }
       ]
@@ -668,25 +575,29 @@
     {
       "id": "light_sunlight",
       "cardName": "サンライト",
-      "description": "光で 12 ダメージ。HPを 4 回復",
-      "damage": 12,
+      "description": "敵単体に18ダメージを与える。与えたダメージの50%分、自身のHPを回復する。",
+      "damage": 18,
       "spCost": 4,
       "elementType": "Light",
       "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "Heal",
-          "value": 4,
-          "secondaryValue": 0
-        }
-      ]
+      "effects": []
+    },
+    {
+      "id": "light_holy",
+      "cardName": "ホーリー",
+      "description": "敵単体に20ダメージを与える。",
+      "damage": 20,
+      "spCost": 3,
+      "elementType": "Light",
+      "exhaustAfterUse": false,
+      "effects": []
     },
     {
       "id": "light_judge",
       "cardName": "ジャッジ",
-      "description": "光で 20 ダメージ。使い切り",
-      "damage": 20,
-      "spCost": 5,
+      "description": "【使い切り】敵単体に「自身の現在HP」と同値のダメージを与える。",
+      "damage": 0,
+      "spCost": 4,
       "elementType": "Light",
       "exhaustAfterUse": true,
       "effects": []
@@ -694,29 +605,9 @@
     {
       "id": "dark_shadow",
       "cardName": "シャドウ",
-      "description": "闇で 8 ダメージ",
-      "damage": 8,
+      "description": "敵単体に11ダメージを与える。",
+      "damage": 11,
       "spCost": 2,
-      "elementType": "Dark",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "dark_dark",
-      "cardName": "ダーク",
-      "description": "闇で 8 ダメージ",
-      "damage": 8,
-      "spCost": 2,
-      "elementType": "Dark",
-      "exhaustAfterUse": false,
-      "effects": []
-    },
-    {
-      "id": "dark_night",
-      "cardName": "ナイト",
-      "description": "闇で 12 ダメージ",
-      "damage": 12,
-      "spCost": 3,
       "elementType": "Dark",
       "exhaustAfterUse": false,
       "effects": []
@@ -724,15 +615,15 @@
     {
       "id": "dark_sacrifice",
       "cardName": "サクリファイス",
-      "description": "反動 3。SPを 2 回復",
+      "description": "自身のHPを5消費する。SPを2回復する。",
       "damage": 0,
-      "spCost": 1,
+      "spCost": 0,
       "elementType": "Dark",
       "exhaustAfterUse": false,
       "effects": [
         {
           "effectType": "SelfDamage",
-          "value": 3,
+          "value": 5,
           "secondaryValue": 0
         },
         {
@@ -743,65 +634,67 @@
       ]
     },
     {
-      "id": "dark_grim",
-      "cardName": "グリム",
-      "description": "闇で 9 ダメージ。反動 2",
-      "damage": 9,
+      "id": "dark_crow",
+      "cardName": "クロウ",
+      "description": "敵単体に4ダメージを与える。次に使用する【闇】カードのダメージを1.5倍にする。",
+      "damage": 4,
+      "spCost": 1,
+      "elementType": "Dark",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "dark_dark",
+      "cardName": "ダーク",
+      "description": "敵単体に11ダメージを与える。",
+      "damage": 11,
       "spCost": 2,
       "elementType": "Dark",
       "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "SelfDamage",
-          "value": 2,
-          "secondaryValue": 0
-        }
-      ]
+      "effects": []
+    },
+    {
+      "id": "dark_grim",
+      "cardName": "グリム",
+      "description": "自身の手札をすべて捨てる。捨てた枚数×5ダメージを敵単体に与える。",
+      "damage": 0,
+      "spCost": 1,
+      "elementType": "Dark",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "dark_night",
+      "cardName": "ナイト",
+      "description": "敵単体に18ダメージを与える。",
+      "damage": 18,
+      "spCost": 3,
+      "elementType": "Dark",
+      "exhaustAfterUse": false,
+      "effects": []
+    },
+    {
+      "id": "dark_nox",
+      "cardName": "ノクス",
+      "description": "敵単体に10ダメージを与える。自身の手札がこのカード1枚のみの場合、ダメージを3倍にする。",
+      "damage": 10,
+      "spCost": 2,
+      "elementType": "Dark",
+      "exhaustAfterUse": false,
+      "effects": []
     },
     {
       "id": "dark_abyss",
       "cardName": "アビス",
-      "description": "闇で 15 ダメージ。反動 4",
-      "damage": 15,
+      "description": "敵単体に22ダメージを与える。自身のHPを3消費し、このカードを自身の【墓地】ではなく【手札】に戻す。",
+      "damage": 22,
       "spCost": 4,
       "elementType": "Dark",
       "exhaustAfterUse": false,
       "effects": [
         {
           "effectType": "SelfDamage",
-          "value": 4,
-          "secondaryValue": 0
-        }
-      ]
-    },
-    {
-      "id": "dark_nox",
-      "cardName": "ノクス",
-      "description": "闇で 8 ダメージ。手札が3枚以下ならさらに+6",
-      "damage": 8,
-      "spCost": 3,
-      "elementType": "Dark",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BonusDamageIfHandCountAtMost",
           "value": 3,
-          "secondaryValue": 6
-        }
-      ]
-    },
-    {
-      "id": "dark_crow",
-      "cardName": "クロウ",
-      "description": "闇で 4 ダメージ。次の闇カードの威力+4",
-      "damage": 4,
-      "spCost": 1,
-      "elementType": "Dark",
-      "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BuffNextElementDamage",
-          "value": 4,
           "secondaryValue": 0
         }
       ]
@@ -809,8 +702,8 @@
     {
       "id": "dark_eclipse",
       "cardName": "イクリプス",
-      "description": "闇で 21 ダメージ。使い切り",
-      "damage": 21,
+      "description": "【使い切り】敵単体に35ダメージを与える。",
+      "damage": 35,
       "spCost": 5,
       "elementType": "Dark",
       "exhaustAfterUse": true,
@@ -819,18 +712,12 @@
     {
       "id": "dark_reaper",
       "cardName": "リーパー",
-      "description": "闇で 13 ダメージ。Break中ならさらに+10",
-      "damage": 13,
+      "description": "敵単体に40ダメージを与える。発動条件: 対象が【Break】中。発動後、自身のHPを1にする。",
+      "damage": 40,
       "spCost": 4,
       "elementType": "Dark",
       "exhaustAfterUse": false,
-      "effects": [
-        {
-          "effectType": "BonusDamageIfTargetBroken",
-          "value": 10,
-          "secondaryValue": 0
-        }
-      ]
+      "effects": []
     }
   ]
 }

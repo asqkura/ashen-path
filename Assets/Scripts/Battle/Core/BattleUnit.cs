@@ -47,12 +47,15 @@ namespace AshenPath.Battle
 
         public int PendingAttackModifier { get; private set; }
 
+        public int PendingAttackMultiplierPercent { get; private set; } = 100;
+
         public void Reset()
         {
             CurrentHp = MaxHp;
             CurrentSp = MaxSp;
             CurrentBarrier = 0;
             PendingAttackModifier = 0;
+            PendingAttackMultiplierPercent = 100;
             PrimaryWeakElement = Data.weakElement;
             SecondaryWeakElement = ElementType.None;
             ShieldCount = MaxShieldCount;
@@ -120,6 +123,18 @@ namespace AshenPath.Battle
             var modifier = PendingAttackModifier;
             PendingAttackModifier = 0;
             return modifier;
+        }
+
+        public void SetPendingAttackMultiplierPercent(int percent)
+        {
+            PendingAttackMultiplierPercent = Mathf.Clamp(percent, 0, 1000);
+        }
+
+        public int ConsumePendingAttackMultiplierPercent()
+        {
+            var percent = PendingAttackMultiplierPercent;
+            PendingAttackMultiplierPercent = 100;
+            return percent;
         }
 
         public void SetWeakElement(ElementType elementType)

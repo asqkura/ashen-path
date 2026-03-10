@@ -17,6 +17,7 @@ namespace AshenPath.Battle
         private static readonly Vector2 HandRootSize = new(1520f, 220f);
         private static readonly Vector2 LogPanelSize = new(520f, 160f);
         private static readonly Vector2 ConfirmButtonSize = new(220f, 68f);
+        private const int DisplayedHandCardCount = 8;
         private const float CardAspectRatio = 1.4f;
         private const float PanelPadding = 24f;
         private const float StatusSectionSpacing = 4f;
@@ -642,13 +643,13 @@ namespace AshenPath.Battle
             handRoot.transform.SetParent(parent, false);
             ConfigureRect(handRoot.GetComponent<RectTransform>(), new Vector2(0f, 30f), HandRootSize, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
 
-            const float cardWidth = 200f;
+            const float cardWidth = 160f;
             var cardHeight = cardWidth * CardAspectRatio;
-            const float spacing = 22f;
-            var totalWidth = (cardWidth * 5f) + (spacing * 4f);
+            const float spacing = 12f;
+            var totalWidth = (cardWidth * DisplayedHandCardCount) + (spacing * (DisplayedHandCardCount - 1f));
             var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
 
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < DisplayedHandCardCount; i++)
             {
                 var x = startX + i * (cardWidth + spacing);
                 var cardRoot = new GameObject($"CardRoot{i}", typeof(RectTransform));
