@@ -44,6 +44,12 @@ namespace AshenPath.Battle
         private static readonly Color DamagePopupColor = new(0.96f, 0.96f, 0.96f, 1f);
 
         private TMP_FontAsset _font;
+        private RectTransform _battleContentRoot;
+        private GameObject _deckEditorPanel;
+        private TextMeshProUGUI _deckEditorCountText;
+        private TextMeshProUGUI _deckEditorHintText;
+        private Button _deckEditorStartButton;
+        private TextMeshProUGUI _deckEditorStartButtonText;
         private TextMeshProUGUI _turnText;
         private TextMeshProUGUI _resultText;
         private TextMeshProUGUI _playerNameText;
@@ -70,6 +76,13 @@ namespace AshenPath.Battle
         private readonly List<TextMeshProUGUI> _cardDescriptionTexts = new();
         private readonly List<TextMeshProUGUI> _cardCostTexts = new();
         private readonly List<Image> _cardBackgrounds = new();
+        private readonly List<Button> _deckCardButtons = new();
+        private readonly List<string> _deckCardIds = new();
+        private readonly List<TextMeshProUGUI> _deckCardTitleTexts = new();
+        private readonly List<TextMeshProUGUI> _deckCardDescriptionTexts = new();
+        private readonly List<TextMeshProUGUI> _deckCardCostTexts = new();
+        private readonly List<Image> _deckCardBackgrounds = new();
+        private readonly List<Outline> _deckCardOutlines = new();
         private readonly StringBuilder _logBuilder = new();
         private Sprite _roundedPanelSprite;
         private Sprite _solidFillSprite;
@@ -123,26 +136,32 @@ namespace AshenPath.Battle
             var background = CreateImage("Background", canvasObject.transform, BackgroundColor);
             StretchFullScreen(background.rectTransform);
 
-            CreateArena(canvasObject.transform);
+            var battleContent = new GameObject("BattleContent", typeof(RectTransform));
+            battleContent.transform.SetParent(canvasObject.transform, false);
+            _battleContentRoot = battleContent.GetComponent<RectTransform>();
+            StretchFullScreen(_battleContentRoot);
 
-            var enemyPanel = CreateStatusPanel("EnemyPanel", canvasObject.transform, new Vector2(TopPanelMargin, -TopPanelMargin), EnemyPanelSize, new Vector2(0f, 1f), "EnemyName", out _enemyNameText);
+            CreateArena(_battleContentRoot);
+
+            var enemyPanel = CreateStatusPanel("EnemyPanel", _battleContentRoot, new Vector2(TopPanelMargin, -TopPanelMargin), EnemyPanelSize, new Vector2(0f, 1f), "EnemyName", out _enemyNameText);
             _enemyWeakText = CreateText("EnemyWeakText", enemyPanel.transform, 20, TextAnchor.MiddleRight, new Color(0.98f, 0.88f, 0.62f, 1f));
             _enemyWeakText.fontStyle = FontStyles.Bold;
             ConfigureRect(_enemyWeakText.rectTransform, new Vector2(-PanelPadding, -PanelPadding - 2f), new Vector2(180f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
             _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, EnemyAccent, out _enemyHpText);
             _enemyShieldFill = CreateStatusBarSection(enemyPanel.transform, "ShieldSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, ShieldAccent, out _enemyShieldText);
 
-            var playerPanel = CreateStatusPanel("PlayerPanel", canvasObject.transform, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
+            var playerPanel = CreateStatusPanel("PlayerPanel", _battleContentRoot, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
             _playerHpFill = CreateStatusBarSection(playerPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset)), StatusBarSize, PlayerAccent, out _playerHpText);
             _playerSpFill = CreateStatusBarSection(playerPanel.transform, "SpSection", new Vector2(PanelPadding, -(PanelPadding + StatusSectionTopOffset + StatusBarSize.y + StatusSectionSpacing)), StatusBarSize, SpAccent, out _playerSpText);
 
-            _resultText = CreateText("ResultText", canvasObject.transform, 54, TextAnchor.MiddleCenter, TextColor);
+            _resultText = CreateText("ResultText", _battleContentRoot, 54, TextAnchor.MiddleCenter, TextColor);
             ConfigureRect(_resultText.rectTransform, new Vector2(0f, 80f), new Vector2(960f, 80f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
             _resultText.gameObject.SetActive(false);
 
-            CreateBattleLog(canvasObject.transform);
-            CreateCardHand(canvasObject.transform);
-            CreateConfirmButton(canvasObject.transform);
+            CreateBattleLog(_battleContentRoot);
+            CreateCardHand(_battleContentRoot);
+            CreateConfirmButton(_battleContentRoot);
+            CreateDeckEditor(canvasObject.transform);
         }
 
         public void Bind(BattleController controller)
@@ -158,6 +177,19 @@ namespace AshenPath.Battle
             {
                 _confirmButton.onClick.RemoveAllListeners();
                 _confirmButton.onClick.AddListener(controller.ConfirmSelectedCards);
+            }
+
+            for (var i = 0; i < _deckCardButtons.Count; i++)
+            {
+                var deckCardIndex = i;
+                _deckCardButtons[i].onClick.RemoveAllListeners();
+                _deckCardButtons[i].onClick.AddListener(() => controller.ToggleDeckCard(_deckCardIds[deckCardIndex]));
+            }
+
+            if (_deckEditorStartButton != null)
+            {
+                _deckEditorStartButton.onClick.RemoveAllListeners();
+                _deckEditorStartButton.onClick.AddListener(controller.ConfirmDeckSelection);
             }
         }
 
@@ -334,6 +366,71 @@ namespace AshenPath.Battle
             _confirmButtonText.text = enabled ? $"確定 ({selectedSpCost} SP)" : "確定";
         }
 
+        public void SetBattleScreenVisible(bool visible)
+        {
+            if (_battleContentRoot != null)
+            {
+                _battleContentRoot.gameObject.SetActive(visible);
+            }
+        }
+
+        public void ShowDeckEditor(IReadOnlyList<BattleCardData> cards, IReadOnlyCollection<string> selectedCardIds, int requiredDeckSize)
+        {
+            if (_deckEditorPanel == null)
+            {
+                return;
+            }
+
+            _deckEditorPanel.SetActive(true);
+            RefreshDeckEditor(cards);
+            SetDeckEditorHint($"あと {Mathf.Max(0, requiredDeckSize - (selectedCardIds?.Count ?? 0))} 枚必要ぬめ");
+            SetDeckEditorSelection(selectedCardIds, requiredDeckSize);
+        }
+
+        public void HideDeckEditor()
+        {
+            if (_deckEditorPanel != null)
+            {
+                _deckEditorPanel.SetActive(false);
+            }
+        }
+
+        public void SetDeckEditorSelection(IReadOnlyCollection<string> selectedCardIds, int requiredDeckSize)
+        {
+            var selectedCount = 0;
+            for (var i = 0; i < _deckCardButtons.Count; i++)
+            {
+                var isSelected = ContainsCardId(selectedCardIds, _deckCardIds[i]);
+                if (isSelected)
+                {
+                    selectedCount++;
+                }
+
+                _deckCardOutlines[i].enabled = isSelected;
+                _deckCardBackgrounds[i].transform.localScale = isSelected ? new Vector3(1.04f, 1.04f, 1f) : Vector3.one;
+            }
+
+            if (_deckEditorCountText != null)
+            {
+                _deckEditorCountText.text = $"DECK {selectedCount} / {requiredDeckSize}";
+            }
+
+            if (_deckEditorStartButton != null)
+            {
+                var canStart = selectedCount == requiredDeckSize;
+                _deckEditorStartButton.interactable = canStart;
+                _deckEditorStartButtonText.text = canStart ? "戦闘開始" : $"戦闘開始 ({selectedCount}/{requiredDeckSize})";
+            }
+        }
+
+        public void SetDeckEditorHint(string message)
+        {
+            if (_deckEditorHintText != null)
+            {
+                _deckEditorHintText.text = message;
+            }
+        }
+
         public void PlayEnemyDamageEffect(int damage, ElementType elementType)
         {
             if (_enemyActorRect == null || damage <= 0)
@@ -363,6 +460,24 @@ namespace AshenPath.Battle
             foreach (var selectedIndex in selectedIndices)
             {
                 if (selectedIndex == index)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsCardId(IReadOnlyCollection<string> selectedCardIds, string cardId)
+        {
+            if (selectedCardIds == null || string.IsNullOrWhiteSpace(cardId))
+            {
+                return false;
+            }
+
+            foreach (var selectedCardId in selectedCardIds)
+            {
+                if (selectedCardId == cardId)
                 {
                     return true;
                 }
@@ -579,6 +694,107 @@ namespace AshenPath.Battle
                     parallaxEffect.BindPointerEnterAction(PlayCursorHoverSe);
                     parallaxEffect.BindVisualTarget(visual.rectTransform);
                 }
+            }
+        }
+
+        private void CreateDeckEditor(Transform parent)
+        {
+            _deckEditorPanel = CreatePanel("DeckEditorPanel", parent, Vector2.zero, new Vector2(1820f, 980f), new Vector2(0.5f, 0.5f));
+            ConfigureRect(_deckEditorPanel.GetComponent<RectTransform>(), Vector2.zero, new Vector2(1820f, 980f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            _deckEditorPanel.GetComponent<Image>().color = new Color(0.07f, 0.08f, 0.1f, 0.97f);
+
+            var title = CreateText("DeckEditorTitle", _deckEditorPanel.transform, 42, TextAnchor.MiddleLeft, TextColor);
+            title.text = "DECK EDIT";
+            title.fontStyle = FontStyles.Bold;
+            ConfigureRect(title.rectTransform, new Vector2(32f, -28f), new Vector2(280f, 44f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            _deckEditorCountText = CreateText("DeckEditorCount", _deckEditorPanel.transform, 28, TextAnchor.MiddleRight, new Color(0.96f, 0.88f, 0.68f, 1f));
+            _deckEditorCountText.fontStyle = FontStyles.Bold;
+            ConfigureRect(_deckEditorCountText.rectTransform, new Vector2(-240f, -32f), new Vector2(280f, 36f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+
+            _deckEditorHintText = CreateText("DeckEditorHint", _deckEditorPanel.transform, 24, TextAnchor.MiddleLeft, new Color(0.82f, 0.86f, 0.92f, 1f));
+            ConfigureRect(_deckEditorHintText.rectTransform, new Vector2(32f, -78f), new Vector2(720f, 30f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+            _deckEditorStartButton = CreateCardButton(_deckEditorPanel.transform, Vector2.zero, new Vector2(220f, 68f));
+            ConfigureRect(_deckEditorStartButton.GetComponent<RectTransform>(), new Vector2(-32f, 32f), new Vector2(220f, 68f), new Vector2(1f, 0f), new Vector2(1f, 0f));
+            _deckEditorStartButton.GetComponent<Image>().color = new Color(0.84f, 0.74f, 0.52f, 1f);
+            _deckEditorStartButtonText = CreateText("DeckEditorStartLabel", _deckEditorStartButton.transform, 24, TextAnchor.MiddleCenter, DarkTextColor);
+            _deckEditorStartButtonText.fontStyle = FontStyles.Bold;
+            _deckEditorStartButtonText.text = "戦闘開始";
+            ConfigureRect(_deckEditorStartButtonText.rectTransform, Vector2.zero, new Vector2(220f, 68f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            var gridRoot = new GameObject("DeckGrid", typeof(RectTransform));
+            gridRoot.transform.SetParent(_deckEditorPanel.transform, false);
+            ConfigureRect(gridRoot.GetComponent<RectTransform>(), new Vector2(0f, -28f), new Vector2(1720f, 760f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            const int columns = 10;
+            const float cardWidth = 156f;
+            const float cardHeight = 116f;
+            const float spacingX = 14f;
+            const float spacingY = 14f;
+            var totalWidth = columns * cardWidth + (columns - 1) * spacingX;
+            var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
+
+            for (var i = 0; i < 60; i++)
+            {
+                var row = i / columns;
+                var column = i % columns;
+                var x = startX + column * (cardWidth + spacingX);
+                var y = 300f - row * (cardHeight + spacingY);
+
+                var button = CreateCardButton(gridRoot.transform, new Vector2(x, y), new Vector2(cardWidth, cardHeight));
+                var visual = CreateCardVisual(button.transform, new Vector2(cardWidth, cardHeight));
+                button.targetGraphic = visual;
+
+                var outline = visual.GetComponent<Outline>();
+                outline.effectColor = new Color(1f, 0.92f, 0.58f, 1f);
+                outline.effectDistance = new Vector2(3f, -3f);
+                outline.enabled = false;
+
+                var titleText = CreateText("DeckTitle", visual.transform, 20, TextAnchor.UpperLeft, DarkTextColor);
+                titleText.fontStyle = FontStyles.Bold;
+                titleText.textWrappingMode = TextWrappingModes.Normal;
+                titleText.overflowMode = TextOverflowModes.Truncate;
+                ConfigureRect(titleText.rectTransform, new Vector2(10f, -8f), new Vector2(cardWidth - 20f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+                var costText = CreateText("DeckCost", visual.transform, 16, TextAnchor.UpperLeft, DarkTextColor);
+                costText.fontStyle = FontStyles.Bold;
+                ConfigureRect(costText.rectTransform, new Vector2(10f, -34f), new Vector2(cardWidth - 20f, 20f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+                var descriptionText = CreateText("DeckDescription", visual.transform, 14, TextAnchor.UpperLeft, DarkTextColor);
+                descriptionText.textWrappingMode = TextWrappingModes.Normal;
+                descriptionText.overflowMode = TextOverflowModes.Truncate;
+                ConfigureRect(descriptionText.rectTransform, new Vector2(10f, -56f), new Vector2(cardWidth - 20f, 48f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+                button.gameObject.SetActive(false);
+                _deckCardButtons.Add(button);
+                _deckCardIds.Add(string.Empty);
+                _deckCardTitleTexts.Add(titleText);
+                _deckCardCostTexts.Add(costText);
+                _deckCardDescriptionTexts.Add(descriptionText);
+                _deckCardBackgrounds.Add(visual);
+                _deckCardOutlines.Add(outline);
+            }
+        }
+
+        private void RefreshDeckEditor(IReadOnlyList<BattleCardData> cards)
+        {
+            for (var i = 0; i < _deckCardButtons.Count; i++)
+            {
+                var hasCard = cards != null && i < cards.Count;
+                _deckCardButtons[i].gameObject.SetActive(hasCard);
+                _deckCardIds[i] = hasCard ? cards[i].id : string.Empty;
+
+                if (!hasCard)
+                {
+                    continue;
+                }
+
+                _deckCardTitleTexts[i].text = cards[i].cardName;
+                _deckCardCostTexts[i].text = $"[{cards[i].spCost}]{GetElementLabel(cards[i].elementType)}";
+                _deckCardDescriptionTexts[i].text = cards[i].description;
+                _deckCardBackgrounds[i].color = GetElementColor(cards[i].elementType);
+                _deckCardOutlines[i].enabled = false;
             }
         }
 

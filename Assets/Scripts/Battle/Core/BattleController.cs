@@ -74,9 +74,12 @@ namespace AshenPath.Battle
     public class BattleController : MonoBehaviour
     {
         private const string CardCatalogResourcePath = "Battle/card-catalog";
+        private const int RequiredDeckSize = 15;
+        private const int HandSize = 5;
 
         private enum BattleState
         {
+            DeckEditing,
             PlayerTurn,
             EnemyTurn,
             BattleEnded
@@ -175,28 +178,92 @@ namespace AshenPath.Battle
         private Coroutine _enemyTurnCoroutine;
         private Coroutine _playerActionCoroutine;
         private int _turnCount;
+        private readonly List<BattleCardData> _allCards = new();
+        private readonly List<BattleCardData> _selectedDeck = new();
+        private readonly List<BattleCardData> _drawPile = new();
+        private readonly List<BattleCardData> _discardPile = new();
         private readonly List<BattleCardData> _hand = new();
         private readonly List<int> _selectedCardIndices = new();
 
         public void Initialize(BattleUI battleUI)
         {
+            InitializeBattle(battleUI);
+        }
+
+        public void InitializeBattle(BattleUI battleUI)
+        {
             _battleUI = battleUI;
             _battleUI.Bind(this);
             LoadCardCatalog();
-
+            SetupDefaultDeck();
             _playerUnit = new BattleUnit(playerUnitData);
             _enemyUnit = new BattleUnit(enemyUnitData);
-            var weakElements = GetRandomWeakElements();
-            _enemyUnit.SetWeakElements(weakElements.primary, weakElements.secondary);
-            _enemyUnit.SetShieldCount(3);
-            _state = BattleState.PlayerTurn;
-            _turnCount = 0;
-
-            RefreshUi();
+            _battleUI.HideDeckEditor();
+            _battleUI.SetBattleScreenVisible(true);
             _battleUI.SetResultText(string.Empty, false);
             _battleUI.ClearBattleLog();
-            _battleUI.AddBattleLog($"{_playerUnit.DisplayName} と {_enemyUnit.DisplayName} の戦闘開始");
-            StartPlayerTurn("プレイヤーのターンです");
+            BeginBattle();
+        }
+
+        public void InitializeDeckEditor(BattleUI battleUI)
+        {
+            _battleUI = battleUI;
+            _battleUI.Bind(this);
+            LoadCardCatalog();
+            SetupDefaultDeck();
+            _playerUnit = new BattleUnit(playerUnitData);
+            _enemyUnit = new BattleUnit(enemyUnitData);
+            _state = BattleState.DeckEditing;
+
+            _battleUI.SetBattleScreenVisible(false);
+            _battleUI.ShowDeckEditor(_allCards, GetSelectedDeckIds(), RequiredDeckSize);
+            _battleUI.SetResultText(string.Empty, false);
+            _battleUI.ClearBattleLog();
+            _battleUI.SetTurnText("デッキを編成してください");
+            _battleUI.SetTurnCount(1);
+        }
+
+        public void ToggleDeckCard(string cardId)
+        {
+            if (_state != BattleState.DeckEditing || string.IsNullOrWhiteSpace(cardId))
+            {
+                return;
+            }
+
+            var card = FindCardById(cardId);
+            if (card == null)
+            {
+                return;
+            }
+
+            if (_selectedDeck.Contains(card))
+            {
+                _selectedDeck.Remove(card);
+            }
+            else
+            {
+                if (_selectedDeck.Count >= RequiredDeckSize)
+                {
+                    _battleUI.SetDeckEditorHint($"デッキは {RequiredDeckSize} 枚までぬめ");
+                    _battleUI.SetDeckEditorSelection(GetSelectedDeckIds(), RequiredDeckSize);
+                    return;
+                }
+
+                _selectedDeck.Add(card);
+            }
+
+            _battleUI.SetDeckEditorHint(_selectedDeck.Count == RequiredDeckSize ? "戦闘開始できるぬめ" : $"あと {RequiredDeckSize - _selectedDeck.Count} 枚必要ぬめ");
+            _battleUI.SetDeckEditorSelection(GetSelectedDeckIds(), RequiredDeckSize);
+        }
+
+        public void ConfirmDeckSelection()
+        {
+            if (_state != BattleState.DeckEditing || _selectedDeck.Count != RequiredDeckSize)
+            {
+                return;
+            }
+
+            BeginBattle();
         }
 
         public void PerformPlayerCard(int cardIndex)
@@ -287,6 +354,30 @@ namespace AshenPath.Battle
             return EnemyAction.Attack;
         }
 
+        private void BeginBattle()
+        {
+            _state = BattleState.PlayerTurn;
+            _turnCount = 0;
+            _selectedCardIndices.Clear();
+            _drawPile.Clear();
+            _discardPile.Clear();
+            _hand.Clear();
+
+            _playerUnit.Reset();
+            _enemyUnit.Reset();
+            var weakElements = GetRandomWeakElements();
+            _enemyUnit.SetWeakElements(weakElements.primary, weakElements.secondary);
+            _enemyUnit.SetShieldCount(3);
+            BuildDrawPile();
+
+            _battleUI.SetBattleScreenVisible(true);
+            _battleUI.HideDeckEditor();
+            RefreshUi();
+            _battleUI.ClearBattleLog();
+            _battleUI.AddBattleLog($"{_playerUnit.DisplayName} と {_enemyUnit.DisplayName} の戦闘開始");
+            StartPlayerTurn("プレイヤーのターンです");
+        }
+
         private void StartPlayerTurn(string turnMessage)
         {
             _state = BattleState.PlayerTurn;
@@ -306,17 +397,30 @@ namespace AshenPath.Battle
 
         private void DrawHand()
         {
-            _hand.Clear();
-
-            if (cardPool.Count == 0)
+            for (var i = 0; i < _hand.Count; i++)
             {
-                return;
+                _discardPile.Add(_hand[i]);
             }
 
-            for (var i = 0; i < 5; i++)
+            _hand.Clear();
+
+            for (var i = 0; i < HandSize; i++)
             {
-                var card = cardPool[UnityEngine.Random.Range(0, cardPool.Count)];
-                _hand.Add(card);
+                if (_drawPile.Count == 0)
+                {
+                    if (_discardPile.Count == 0)
+                    {
+                        break;
+                    }
+
+                    _drawPile.AddRange(_discardPile);
+                    _discardPile.Clear();
+                    ShuffleCards(_drawPile);
+                }
+
+                var drawIndex = _drawPile.Count - 1;
+                _hand.Add(_drawPile[drawIndex]);
+                _drawPile.RemoveAt(drawIndex);
             }
         }
 
@@ -385,7 +489,7 @@ namespace AshenPath.Battle
 
                 if (selectedCard.exhaustAfterUse)
                 {
-                    cardPool.Remove(selectedCard);
+                    RemoveCardFromBattleDeck(selectedCard);
                     _battleUI.AddBattleLog($"{selectedCard.cardName} は使い切りで消滅");
                 }
 
@@ -400,6 +504,8 @@ namespace AshenPath.Battle
                     yield return new WaitForSeconds(playerCardActionInterval);
                 }
             }
+
+            MovePlayedCardsToDiscard(selectedIndices);
 
             _playerActionCoroutine = null;
             _state = BattleState.EnemyTurn;
@@ -651,6 +757,9 @@ namespace AshenPath.Battle
             {
                 cardPool.Add(ConvertCard(catalog.cards[i]));
             }
+
+            _allCards.Clear();
+            _allCards.AddRange(cardPool);
         }
 
         private static BattleCardData ConvertCard(BattleCardJson source)
@@ -731,6 +840,85 @@ namespace AshenPath.Battle
                 ElementType.Dark => "闇",
                 _ => "無"
             };
+        }
+
+        private void SetupDefaultDeck()
+        {
+            _selectedDeck.Clear();
+            for (var i = 0; i < Mathf.Min(RequiredDeckSize, _allCards.Count); i++)
+            {
+                _selectedDeck.Add(_allCards[i]);
+            }
+        }
+
+        private BattleCardData FindCardById(string cardId)
+        {
+            for (var i = 0; i < _allCards.Count; i++)
+            {
+                if (string.Equals(_allCards[i].id, cardId, StringComparison.Ordinal))
+                {
+                    return _allCards[i];
+                }
+            }
+
+            return null;
+        }
+
+        private List<string> GetSelectedDeckIds()
+        {
+            var ids = new List<string>(_selectedDeck.Count);
+            for (var i = 0; i < _selectedDeck.Count; i++)
+            {
+                ids.Add(_selectedDeck[i].id);
+            }
+
+            return ids;
+        }
+
+        private void BuildDrawPile()
+        {
+            _drawPile.Clear();
+            _discardPile.Clear();
+            _drawPile.AddRange(_selectedDeck);
+            ShuffleCards(_drawPile);
+        }
+
+        private static void ShuffleCards(List<BattleCardData> cards)
+        {
+            for (var i = cards.Count - 1; i > 0; i--)
+            {
+                var swapIndex = UnityEngine.Random.Range(0, i + 1);
+                (cards[i], cards[swapIndex]) = (cards[swapIndex], cards[i]);
+            }
+        }
+
+        private void MovePlayedCardsToDiscard(IReadOnlyList<int> selectedIndices)
+        {
+            for (var i = selectedIndices.Count - 1; i >= 0; i--)
+            {
+                var index = selectedIndices[i];
+                if (index < 0 || index >= _hand.Count)
+                {
+                    continue;
+                }
+
+                var playedCard = _hand[index];
+                if (!playedCard.exhaustAfterUse)
+                {
+                    _discardPile.Add(playedCard);
+                }
+
+                _hand.RemoveAt(index);
+            }
+
+            _battleUI.RefreshHand(_hand);
+        }
+
+        private void RemoveCardFromBattleDeck(BattleCardData card)
+        {
+            _selectedDeck.Remove(card);
+            _drawPile.Remove(card);
+            _discardPile.Remove(card);
         }
     }
 }
