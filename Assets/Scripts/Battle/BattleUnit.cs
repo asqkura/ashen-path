@@ -19,6 +19,8 @@ namespace AshenPath.Battle
 
         public int CurrentSp { get; private set; }
 
+        public int CurrentBarrier { get; private set; }
+
         public bool IsDead => CurrentHp <= 0;
 
         public int MaxHp => Mathf.Max(1, Data.maxHp);
@@ -43,10 +45,14 @@ namespace AshenPath.Battle
 
         public int BreakTurnsRemaining { get; private set; }
 
+        public int PendingAttackModifier { get; private set; }
+
         public void Reset()
         {
             CurrentHp = MaxHp;
             CurrentSp = MaxSp;
+            CurrentBarrier = 0;
+            PendingAttackModifier = 0;
             PrimaryWeakElement = Data.weakElement;
             SecondaryWeakElement = ElementType.None;
             ShieldCount = MaxShieldCount;
@@ -55,15 +61,31 @@ namespace AshenPath.Battle
 
         public int TakeDamage(int amount)
         {
+            return TakeDamage(amount, out _);
+        }
+
+        public int TakeDamage(int amount, out int absorbedByBarrier)
+        {
             var damage = Mathf.Max(0, amount);
-            CurrentHp = Mathf.Clamp(CurrentHp - damage, 0, MaxHp);
-            return damage;
+            absorbedByBarrier = Mathf.Min(CurrentBarrier, damage);
+            CurrentBarrier = Mathf.Max(0, CurrentBarrier - absorbedByBarrier);
+            var remainingDamage = Mathf.Max(0, damage - absorbedByBarrier);
+            CurrentHp = Mathf.Clamp(CurrentHp - remainingDamage, 0, MaxHp);
+            return remainingDamage;
         }
 
         public void RecoverSp(int amount)
         {
             var recovery = Mathf.Max(0, amount);
             CurrentSp = Mathf.Clamp(CurrentSp + recovery, 0, MaxSp);
+        }
+
+        public int Heal(int amount)
+        {
+            var recovery = Mathf.Max(0, amount);
+            var previousHp = CurrentHp;
+            CurrentHp = Mathf.Clamp(CurrentHp + recovery, 0, MaxHp);
+            return CurrentHp - previousHp;
         }
 
         public bool CanSpendSp(int amount)
@@ -81,6 +103,23 @@ namespace AshenPath.Battle
 
             CurrentSp -= cost;
             return true;
+        }
+
+        public void AddBarrier(int amount)
+        {
+            CurrentBarrier = Mathf.Max(0, CurrentBarrier + Mathf.Max(0, amount));
+        }
+
+        public void AddPendingAttackModifier(int amount)
+        {
+            PendingAttackModifier += amount;
+        }
+
+        public int ConsumePendingAttackModifier()
+        {
+            var modifier = PendingAttackModifier;
+            PendingAttackModifier = 0;
+            return modifier;
         }
 
         public void SetWeakElement(ElementType elementType)

@@ -1,22 +1,80 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace AshenPath.Battle
 {
-    [System.Serializable]
+    public enum BattleCardEffectType
+    {
+        RepeatAttack,
+        RecoverSp,
+        Heal,
+        SelfDamage,
+        GainBarrier,
+        BuffNextCardDamage,
+        BuffNextElementDamage,
+        DiscountNextCardSp,
+        DiscountNextElementSp,
+        EnemyAttackDown,
+        ExtraShieldDamage,
+        BonusDamageIfTargetBroken,
+        BonusDamageIfCardSequenceAtLeast,
+        BonusDamageIfHandCountAtMost
+    }
+
+    [Serializable]
+    public class BattleCardEffectData
+    {
+        public BattleCardEffectType effectType;
+        public int value;
+        public int secondaryValue;
+    }
+
+    [Serializable]
     public class BattleCardData
     {
+        public string id = "attack";
         public string cardName = "Strike";
         public string description = "Basic attack.";
         public int damage = 8;
         public int spCost = 1;
         public ElementType elementType = ElementType.None;
         public bool exhaustAfterUse;
+        public List<BattleCardEffectData> effects = new();
+    }
+
+    [Serializable]
+    public class BattleCardEffectJson
+    {
+        public string effectType;
+        public int value;
+        public int secondaryValue;
+    }
+
+    [Serializable]
+    public class BattleCardJson
+    {
+        public string id;
+        public string cardName;
+        public string description;
+        public int damage;
+        public int spCost;
+        public string elementType;
+        public bool exhaustAfterUse;
+        public List<BattleCardEffectJson> effects = new();
+    }
+
+    [Serializable]
+    public class BattleCardCatalog
+    {
+        public List<BattleCardJson> cards = new();
     }
 
     public class BattleController : MonoBehaviour
     {
+        private const string CardCatalogResourcePath = "Battle/card-catalog";
+
         private enum BattleState
         {
             PlayerTurn,
@@ -27,6 +85,69 @@ namespace AshenPath.Battle
         private enum EnemyAction
         {
             Attack
+        }
+
+        private sealed class PlayerTurnEffectState
+        {
+            private readonly Dictionary<ElementType, int> _nextElementDamageBonus = new();
+            private readonly Dictionary<ElementType, int> _nextElementSpDiscount = new();
+
+            public int NextCardDamageBonus { get; set; }
+
+            public int NextCardSpDiscount { get; set; }
+
+            public int ConsumeDamageBonus(ElementType elementType)
+            {
+                var total = NextCardDamageBonus;
+                NextCardDamageBonus = 0;
+
+                if (_nextElementDamageBonus.TryGetValue(elementType, out var elementBonus))
+                {
+                    total += elementBonus;
+                    _nextElementDamageBonus.Remove(elementType);
+                }
+
+                return total;
+            }
+
+            public int ConsumeSpDiscount(ElementType elementType)
+            {
+                var total = NextCardSpDiscount;
+                NextCardSpDiscount = 0;
+
+                if (_nextElementSpDiscount.TryGetValue(elementType, out var elementDiscount))
+                {
+                    total += elementDiscount;
+                    _nextElementSpDiscount.Remove(elementType);
+                }
+
+                return total;
+            }
+
+            public void AddNextElementDamageBonus(ElementType elementType, int value)
+            {
+                if (value <= 0)
+                {
+                    return;
+                }
+
+                _nextElementDamageBonus[elementType] = GetDictionaryValue(_nextElementDamageBonus, elementType) + value;
+            }
+
+            public void AddNextElementSpDiscount(ElementType elementType, int value)
+            {
+                if (value <= 0)
+                {
+                    return;
+                }
+
+                _nextElementSpDiscount[elementType] = GetDictionaryValue(_nextElementSpDiscount, elementType) + value;
+            }
+
+            private static int GetDictionaryValue(Dictionary<ElementType, int> dictionary, ElementType key)
+            {
+                return dictionary.TryGetValue(key, out var value) ? value : 0;
+            }
         }
 
         [SerializeField] private float enemyTurnDelay = 0.9f;
@@ -45,20 +166,7 @@ namespace AshenPath.Battle
             maxHp = 32,
             attackPower = 6
         };
-        [SerializeField] private List<BattleCardData> cardPool = new()
-        {
-            new BattleCardData { cardName = "アタック", description = "無属性で 8 ダメージ", damage = 8, spCost = 2, elementType = ElementType.None },
-            new BattleCardData { cardName = "ウィンド", description = "風で 7 ダメージ", damage = 7, spCost = 1, elementType = ElementType.Wind },
-            new BattleCardData { cardName = "ファイア", description = "火で 10 ダメージ", damage = 10, spCost = 3, elementType = ElementType.Fire },
-            new BattleCardData { cardName = "ウィンド+", description = "風で 6 ダメージ", damage = 6, spCost = 1, elementType = ElementType.Wind },
-            new BattleCardData { cardName = "アイス", description = "氷で 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Ice },
-            new BattleCardData { cardName = "ライト", description = "光で 7 ダメージ", damage = 7, spCost = 2, elementType = ElementType.Light },
-            new BattleCardData { cardName = "ダーク", description = "闇で 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Dark },
-            new BattleCardData { cardName = "ファイア+", description = "火で 11 ダメージ。使い切り", damage = 11, spCost = 4, elementType = ElementType.Fire, exhaustAfterUse = true },
-            new BattleCardData { cardName = "アイス+", description = "氷で 5 ダメージ", damage = 5, spCost = 1, elementType = ElementType.Ice },
-            new BattleCardData { cardName = "ライト+", description = "光で 11 ダメージ", damage = 11, spCost = 3, elementType = ElementType.Light },
-            new BattleCardData { cardName = "ダーク+", description = "闇で 12 ダメージ。使い切り", damage = 12, spCost = 4, elementType = ElementType.Dark, exhaustAfterUse = true },
-        };
+        [SerializeField] private List<BattleCardData> cardPool = new();
 
         private BattleState _state;
         private BattleUnit _playerUnit;
@@ -74,6 +182,7 @@ namespace AshenPath.Battle
         {
             _battleUI = battleUI;
             _battleUI.Bind(this);
+            LoadCardCatalog();
 
             _playerUnit = new BattleUnit(playerUnitData);
             _enemyUnit = new BattleUnit(enemyUnitData);
@@ -109,10 +218,11 @@ namespace AshenPath.Battle
                 return;
             }
 
-            var selectedCard = _hand[cardIndex];
-            if (GetSelectedSpCost() + selectedCard.spCost > _playerUnit.CurrentSp)
+            var candidateIndices = new List<int>(_selectedCardIndices) { cardIndex };
+            var projectedCost = GetSelectedSpCost(candidateIndices);
+            if (projectedCost > _playerUnit.CurrentSp)
             {
-                var message = $"SP不足: {selectedCard.cardName} を追加できません";
+                var message = $"SP不足: {_hand[cardIndex].cardName} を追加できません";
                 _battleUI.SetTurnText(message);
                 _battleUI.AddBattleLog(message);
                 RefreshUi();
@@ -159,7 +269,8 @@ namespace AshenPath.Battle
             switch (ChooseEnemyAction())
             {
                 case EnemyAction.Attack:
-                    PerformAttack(_enemyUnit, _playerUnit, _enemyUnit.AttackPower, "Claw", ElementType.None);
+                    var attackPower = Mathf.Max(0, _enemyUnit.AttackPower + _enemyUnit.ConsumePendingAttackModifier());
+                    PerformAttack(_enemyUnit, _playerUnit, attackPower, "Claw", ElementType.None);
                     break;
             }
 
@@ -204,17 +315,27 @@ namespace AshenPath.Battle
 
             for (var i = 0; i < 5; i++)
             {
-                var card = cardPool[Random.Range(0, cardPool.Count)];
+                var card = cardPool[UnityEngine.Random.Range(0, cardPool.Count)];
                 _hand.Add(card);
             }
         }
 
-        private void PerformAttack(BattleUnit attacker, BattleUnit defender, int damage, string attackName, ElementType elementType)
+        private void PerformAttack(BattleUnit attacker, BattleUnit defender, int damage, string attackName, ElementType elementType, int extraShieldDamage = 0)
         {
             var wasBroken = defender.IsBroken;
             if (defender.TryBreakShield(elementType))
             {
                 _battleUI.AddBattleLog("弱点を突いてシールドを削ったぬめ！");
+                for (var i = 0; i < extraShieldDamage; i++)
+                {
+                    if (!defender.TryBreakShield(elementType))
+                    {
+                        break;
+                    }
+
+                    _battleUI.AddBattleLog("追撃でシールドを削ったぬめ！");
+                }
+
                 if (defender.IsBroken)
                 {
                     _battleUI.AddBattleLog($"{defender.DisplayName} は Break 状態ぬめ！");
@@ -222,20 +343,27 @@ namespace AshenPath.Battle
             }
 
             var dealtDamage = wasBroken ? damage * 2 : damage;
-            dealtDamage = defender.TakeDamage(dealtDamage);
+            dealtDamage = defender.TakeDamage(dealtDamage, out var absorbedByBarrier);
             RefreshUi();
-            if (defender == _enemyUnit)
+            if (defender == _enemyUnit && dealtDamage > 0)
             {
                 _battleUI.PlayEnemyDamageEffect(dealtDamage, elementType);
             }
 
             var message = $"{attacker.DisplayName} の {attackName}！ {defender.DisplayName} に {dealtDamage} ダメージ";
+            if (absorbedByBarrier > 0)
+            {
+                message += $" ({absorbedByBarrier} ガード)";
+            }
+
             _battleUI.SetTurnText(message);
             _battleUI.AddBattleLog(message);
         }
 
         private IEnumerator ResolvePlayerCards(IReadOnlyList<int> selectedIndices)
         {
+            var effectState = new PlayerTurnEffectState();
+
             for (var i = 0; i < selectedIndices.Count; i++)
             {
                 var cardIndex = selectedIndices[i];
@@ -245,14 +373,15 @@ namespace AshenPath.Battle
                 }
 
                 var selectedCard = _hand[cardIndex];
-                if (!_playerUnit.SpendSp(selectedCard.spCost))
+                var actualCost = Mathf.Max(0, selectedCard.spCost - effectState.ConsumeSpDiscount(selectedCard.elementType));
+                if (!_playerUnit.SpendSp(actualCost))
                 {
                     continue;
                 }
 
                 RefreshUi();
                 _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は {selectedCard.cardName} を使用");
-                PerformAttack(_playerUnit, _enemyUnit, selectedCard.damage, selectedCard.cardName, selectedCard.elementType);
+                ResolveCardEffects(selectedCard, effectState, i + 1);
 
                 if (selectedCard.exhaustAfterUse)
                 {
@@ -278,6 +407,129 @@ namespace AshenPath.Battle
             _battleUI.AddBattleLog("敵のターン");
             UpdateCardState();
             _enemyTurnCoroutine = StartCoroutine(ExecuteEnemyTurn());
+        }
+
+        private void ResolveCardEffects(BattleCardData card, PlayerTurnEffectState effectState, int sequenceIndex)
+        {
+            var damageBonus = effectState.ConsumeDamageBonus(card.elementType);
+            var currentDamage = Mathf.Max(0, card.damage + damageBonus);
+            var extraShieldDamage = 0;
+            var repeatEffects = new List<BattleCardEffectData>();
+
+            if (card.effects != null)
+            {
+                for (var i = 0; i < card.effects.Count; i++)
+                {
+                    var effect = card.effects[i];
+                    switch (effect.effectType)
+                    {
+                        case BattleCardEffectType.ExtraShieldDamage:
+                            extraShieldDamage += Mathf.Max(0, effect.value);
+                            break;
+                        case BattleCardEffectType.BonusDamageIfTargetBroken:
+                            if (_enemyUnit.IsBroken)
+                            {
+                                currentDamage += Mathf.Max(0, effect.value);
+                            }
+                            break;
+                        case BattleCardEffectType.BonusDamageIfCardSequenceAtLeast:
+                            if (sequenceIndex >= Mathf.Max(1, effect.value))
+                            {
+                                currentDamage += Mathf.Max(0, effect.secondaryValue);
+                            }
+                            break;
+                        case BattleCardEffectType.BonusDamageIfHandCountAtMost:
+                            if (Mathf.Max(0, _hand.Count - sequenceIndex) <= Mathf.Max(0, effect.value))
+                            {
+                                currentDamage += Mathf.Max(0, effect.secondaryValue);
+                            }
+                            break;
+                        case BattleCardEffectType.RepeatAttack:
+                            repeatEffects.Add(effect);
+                            break;
+                    }
+                }
+            }
+
+            if (currentDamage > 0 || (extraShieldDamage > 0 && card.elementType != ElementType.None))
+            {
+                PerformAttack(_playerUnit, _enemyUnit, currentDamage, card.cardName, card.elementType, extraShieldDamage);
+            }
+            else
+            {
+                _battleUI.SetTurnText($"{_playerUnit.DisplayName} の {card.cardName}！");
+            }
+
+            for (var i = 0; i < repeatEffects.Count; i++)
+            {
+                var repeatEffect = repeatEffects[i];
+                var hitDamage = Mathf.Max(0, repeatEffect.value);
+                var hitCount = Mathf.Max(1, repeatEffect.secondaryValue);
+                for (var hitIndex = 0; hitIndex < hitCount; hitIndex++)
+                {
+                    PerformAttack(_playerUnit, _enemyUnit, hitDamage, $"{card.cardName} 追撃", card.elementType);
+                    if (_enemyUnit.IsDead)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            ApplyPostCardEffects(card, effectState);
+            RefreshUi();
+        }
+
+        private void ApplyPostCardEffects(BattleCardData card, PlayerTurnEffectState effectState)
+        {
+            if (card.effects == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < card.effects.Count; i++)
+            {
+                var effect = card.effects[i];
+                switch (effect.effectType)
+                {
+                    case BattleCardEffectType.RecoverSp:
+                        var previousSp = _playerUnit.CurrentSp;
+                        _playerUnit.RecoverSp(effect.value);
+                        _battleUI.AddBattleLog($"{_playerUnit.DisplayName} のSPが {_playerUnit.CurrentSp - previousSp} 回復");
+                        break;
+                    case BattleCardEffectType.Heal:
+                        var healed = _playerUnit.Heal(effect.value);
+                        _battleUI.AddBattleLog($"{_playerUnit.DisplayName} はHPを {healed} 回復");
+                        break;
+                    case BattleCardEffectType.SelfDamage:
+                        var selfDamage = _playerUnit.TakeDamage(effect.value);
+                        _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は反動で {selfDamage} ダメージ");
+                        break;
+                    case BattleCardEffectType.GainBarrier:
+                        _playerUnit.AddBarrier(effect.value);
+                        _battleUI.AddBattleLog($"{_playerUnit.DisplayName} はガードを {Mathf.Max(0, effect.value)} 獲得");
+                        break;
+                    case BattleCardEffectType.BuffNextCardDamage:
+                        effectState.NextCardDamageBonus += Mathf.Max(0, effect.value);
+                        _battleUI.AddBattleLog("次のカードの威力が上がったぬめ");
+                        break;
+                    case BattleCardEffectType.BuffNextElementDamage:
+                        effectState.AddNextElementDamageBonus(card.elementType, effect.value);
+                        _battleUI.AddBattleLog($"次の{GetElementLabel(card.elementType)}カードの威力が上がったぬめ");
+                        break;
+                    case BattleCardEffectType.DiscountNextCardSp:
+                        effectState.NextCardSpDiscount += Mathf.Max(0, effect.value);
+                        _battleUI.AddBattleLog("次のカードの消費SPが下がったぬめ");
+                        break;
+                    case BattleCardEffectType.DiscountNextElementSp:
+                        effectState.AddNextElementSpDiscount(card.elementType, effect.value);
+                        _battleUI.AddBattleLog($"次の{GetElementLabel(card.elementType)}カードの消費SPが下がったぬめ");
+                        break;
+                    case BattleCardEffectType.EnemyAttackDown:
+                        _enemyUnit.AddPendingAttackModifier(-Mathf.Max(0, effect.value));
+                        _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} の次の攻撃が弱まったぬめ");
+                        break;
+                }
+            }
         }
 
         private bool TryResolveBattleEnd()
@@ -319,39 +571,166 @@ namespace AshenPath.Battle
 
         private void UpdateCardState()
         {
-            var remainingSp = Mathf.Max(0, _playerUnit.CurrentSp - GetSelectedSpCost());
+            var remainingSp = Mathf.Max(0, _playerUnit.CurrentSp - GetSelectedSpCost(_selectedCardIndices));
             _battleUI.SetCardsInteractable(_state == BattleState.PlayerTurn, _hand, remainingSp, _selectedCardIndices);
             _battleUI.SetSelectedCards(_selectedCardIndices, _hand, _playerUnit.CurrentSp);
-            _battleUI.SetConfirmButtonState(_state == BattleState.PlayerTurn && _selectedCardIndices.Count > 0, GetSelectedSpCost());
+            _battleUI.SetConfirmButtonState(_state == BattleState.PlayerTurn && _selectedCardIndices.Count > 0, GetSelectedSpCost(_selectedCardIndices));
         }
 
-        private int GetSelectedSpCost()
+        private int GetSelectedSpCost(IReadOnlyList<int> selectedIndices)
         {
             var total = 0;
-            for (var i = 0; i < _selectedCardIndices.Count; i++)
+            var effectState = new PlayerTurnEffectState();
+
+            for (var i = 0; i < selectedIndices.Count; i++)
             {
-                var index = _selectedCardIndices[i];
+                var index = selectedIndices[i];
                 if (index < 0 || index >= _hand.Count)
                 {
                     continue;
                 }
 
-                total += Mathf.Max(0, _hand[index].spCost);
+                var card = _hand[index];
+                total += Mathf.Max(0, card.spCost - effectState.ConsumeSpDiscount(card.elementType));
+                ApplySelectionDiscountEffects(card, effectState);
             }
 
             return total;
         }
 
+        private static void ApplySelectionDiscountEffects(BattleCardData card, PlayerTurnEffectState effectState)
+        {
+            if (card.effects == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < card.effects.Count; i++)
+            {
+                var effect = card.effects[i];
+                switch (effect.effectType)
+                {
+                    case BattleCardEffectType.DiscountNextCardSp:
+                        effectState.NextCardSpDiscount += Mathf.Max(0, effect.value);
+                        break;
+                    case BattleCardEffectType.DiscountNextElementSp:
+                        effectState.AddNextElementSpDiscount(card.elementType, effect.value);
+                        break;
+                }
+            }
+        }
+
         private static (ElementType primary, ElementType secondary) GetRandomWeakElements()
         {
-            var primary = (ElementType)Random.Range(1, 6);
+            var primary = (ElementType)UnityEngine.Random.Range(1, 6);
             var secondary = primary;
             while (secondary == primary)
             {
-                secondary = (ElementType)Random.Range(1, 6);
+                secondary = (ElementType)UnityEngine.Random.Range(1, 6);
             }
 
             return (primary, secondary);
+        }
+
+        private void LoadCardCatalog()
+        {
+            var catalogAsset = Resources.Load<TextAsset>(CardCatalogResourcePath);
+            if (catalogAsset == null || string.IsNullOrWhiteSpace(catalogAsset.text))
+            {
+                throw new InvalidOperationException($"カードカタログが見つからないぬめ: Resources/{CardCatalogResourcePath}.json");
+            }
+
+            var catalog = JsonUtility.FromJson<BattleCardCatalog>(catalogAsset.text);
+            if (catalog?.cards == null || catalog.cards.Count == 0)
+            {
+                throw new InvalidOperationException($"カードカタログが空か不正ぬめ: Resources/{CardCatalogResourcePath}.json");
+            }
+
+            cardPool = new List<BattleCardData>(catalog.cards.Count);
+            for (var i = 0; i < catalog.cards.Count; i++)
+            {
+                cardPool.Add(ConvertCard(catalog.cards[i]));
+            }
+        }
+
+        private static BattleCardData ConvertCard(BattleCardJson source)
+        {
+            if (source == null)
+            {
+                throw new InvalidOperationException("カード定義が不正ぬめ");
+            }
+
+            return new BattleCardData
+            {
+                id = string.IsNullOrWhiteSpace(source.id) ? source.cardName : source.id,
+                cardName = source.cardName,
+                description = source.description,
+                damage = source.damage,
+                spCost = source.spCost,
+                elementType = ParseElementType(source.elementType),
+                exhaustAfterUse = source.exhaustAfterUse,
+                effects = ConvertEffects(source.effects)
+            };
+        }
+
+        private static List<BattleCardEffectData> ConvertEffects(List<BattleCardEffectJson> source)
+        {
+            var effects = new List<BattleCardEffectData>();
+            if (source == null)
+            {
+                return effects;
+            }
+
+            for (var i = 0; i < source.Count; i++)
+            {
+                var effect = source[i];
+                if (effect == null || string.IsNullOrWhiteSpace(effect.effectType))
+                {
+                    continue;
+                }
+
+                effects.Add(new BattleCardEffectData
+                {
+                    effectType = ParseEffectType(effect.effectType),
+                    value = effect.value,
+                    secondaryValue = effect.secondaryValue
+                });
+            }
+
+            return effects;
+        }
+
+        private static ElementType ParseElementType(string elementType)
+        {
+            if (Enum.TryParse(elementType, true, out ElementType parsed))
+            {
+                return parsed;
+            }
+
+            throw new InvalidOperationException($"不明な属性ぬめ: {elementType}");
+        }
+
+        private static BattleCardEffectType ParseEffectType(string effectType)
+        {
+            if (Enum.TryParse(effectType, true, out BattleCardEffectType parsed))
+            {
+                return parsed;
+            }
+
+            throw new InvalidOperationException($"不明なカード効果ぬめ: {effectType}");
+        }
+
+        private static string GetElementLabel(ElementType elementType)
+        {
+            return elementType switch
+            {
+                ElementType.Fire => "炎",
+                ElementType.Ice => "氷",
+                ElementType.Wind => "風",
+                ElementType.Light => "光",
+                ElementType.Dark => "闇",
+                _ => "無"
+            };
         }
     }
 }

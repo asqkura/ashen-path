@@ -444,7 +444,9 @@ namespace AshenPath.Battle
         private void UpdateUnitDisplay(BattleUnit unit, TextMeshProUGUI nameText, TextMeshProUGUI hpText, Image hpFill)
         {
             nameText.text = unit.DisplayName;
-            hpText.text = $"HP {unit.CurrentHp} / {unit.MaxHp}";
+            hpText.text = unit.CurrentBarrier > 0
+                ? $"HP {unit.CurrentHp} / {unit.MaxHp}  G {unit.CurrentBarrier}"
+                : $"HP {unit.CurrentHp} / {unit.MaxHp}";
             var targetFill = unit.CurrentHp / (float)unit.MaxHp;
             if (hpFill == _playerHpFill)
             {
@@ -508,10 +510,15 @@ namespace AshenPath.Battle
             _turnCountText.fontStyle = FontStyles.Bold;
             ConfigureRect(_turnCountText.rectTransform, new Vector2(-20f, -18f), new Vector2(160f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
 
+            _turnText = CreateText("TurnText", logPanel.transform, 18, TextAnchor.MiddleLeft, new Color(0.9f, 0.92f, 0.96f, 1f));
+            _turnText.textWrappingMode = TextWrappingModes.Normal;
+            _turnText.overflowMode = TextOverflowModes.Ellipsis;
+            ConfigureRect(_turnText.rectTransform, new Vector2(20f, -48f), new Vector2(LogPanelSize.x - 200f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
             _logText = CreateText("BattleLogText", logPanel.transform, 20, TextAnchor.UpperLeft, TextColor);
             _logText.textWrappingMode = TextWrappingModes.Normal;
             _logText.overflowMode = TextOverflowModes.Truncate;
-            ConfigureRect(_logText.rectTransform, new Vector2(20f, -54f), new Vector2(LogPanelSize.x - 40f, LogPanelSize.y - 74f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            ConfigureRect(_logText.rectTransform, new Vector2(20f, -78f), new Vector2(LogPanelSize.x - 40f, LogPanelSize.y - 98f), new Vector2(0f, 1f), new Vector2(0f, 1f));
         }
 
         private void CreateCardHand(Transform parent)
