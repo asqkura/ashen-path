@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -7,10 +8,15 @@ namespace AshenPath.Battle
     {
         private const float MaxTiltDegrees = 16f;
         private const float RotationLerpSpeed = 18f;
+        private const float HoverLift = 20f;
+        private const float HoverLiftLerpSpeed = 14f;
 
         private RectTransform _rectTransform;
         private Quaternion _targetRotation = Quaternion.identity;
         private bool _isPointerInside;
+        private float _targetHoverOffsetY;
+        private float _currentHoverOffsetY;
+        private Action _pointerEnterAction;
 
         private void Awake()
         {
@@ -20,12 +26,16 @@ namespace AshenPath.Battle
         private void Update()
         {
             transform.localRotation = Quaternion.Lerp(transform.localRotation, _targetRotation, Time.unscaledDeltaTime * RotationLerpSpeed);
+            _currentHoverOffsetY = Mathf.Lerp(_currentHoverOffsetY, _targetHoverOffsetY, Time.unscaledDeltaTime * HoverLiftLerpSpeed);
+            transform.localPosition = new Vector3(0f, _currentHoverOffsetY, 0f);
         }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
             _isPointerInside = true;
+            _targetHoverOffsetY = HoverLift;
             UpdateRotation(eventData);
+            _pointerEnterAction?.Invoke();
         }
 
         public void OnPointerMove(PointerEventData eventData)
@@ -42,13 +52,22 @@ namespace AshenPath.Battle
         {
             _isPointerInside = false;
             _targetRotation = Quaternion.identity;
+            _targetHoverOffsetY = 0f;
         }
 
         private void OnDisable()
         {
             _isPointerInside = false;
             _targetRotation = Quaternion.identity;
+            _targetHoverOffsetY = 0f;
+            _currentHoverOffsetY = 0f;
             transform.localRotation = Quaternion.identity;
+            transform.localPosition = Vector3.zero;
+        }
+
+        public void BindPointerEnterAction(Action pointerEnterAction)
+        {
+            _pointerEnterAction = pointerEnterAction;
         }
 
         private void UpdateRotation(PointerEventData eventData)

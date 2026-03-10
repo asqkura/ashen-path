@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Text;
 using TMPro;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine;
 using UnityEngine.UI;
 namespace AshenPath.Battle
@@ -20,6 +22,8 @@ namespace AshenPath.Battle
         private const float StatusSectionSpacing = 18f;
         private const float TopPanelMargin = 32f;
         private const float SelectedCardHop = 18f;
+        private const string CursorSeAddress = "Assets/Audios/SE/cursor.mp3";
+        private const string CursorSeGuid = "54db76d7baca3e84d8ade6f541a9f026";
         private static readonly Color BackgroundColor = new(0.08f, 0.09f, 0.12f, 1f);
         private static readonly Color PanelColor = new(0.14f, 0.16f, 0.2f, 0.92f);
         private static readonly Color EnemyAccent = new(0.76f, 0.32f, 0.32f, 1f);
@@ -67,6 +71,12 @@ namespace AshenPath.Battle
         private RectTransform _enemyActorRect;
         private Vector2 _enemyActorBasePosition;
         private Coroutine _enemyShakeCoroutine;
+        private AudioSource _uiAudioSource;
+        private AsyncOperationHandle<AudioClip> _cursorSeHandle;
+        private bool _cursorSeHandleInitialized;
+        private bool _cursorSeLoadRequested;
+        private AsyncOperationHandle<IList<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation>> _cursorSeLocationHandle;
+        private bool _cursorSeLocationHandleInitialized;
 
         public void Build()
         {
@@ -88,6 +98,11 @@ namespace AshenPath.Battle
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
+
+            _uiAudioSource = canvasObject.AddComponent<AudioSource>();
+            _uiAudioSource.playOnAwake = false;
+            _uiAudioSource.loop = false;
+            _uiAudioSource.spatialBlend = 0f;
 
             var background = CreateImage("Background", canvasObject.transform, BackgroundColor);
             StretchFullScreen(background.rectTransform);
@@ -460,9 +475,14 @@ namespace AshenPath.Battle
             for (var i = 0; i < 5; i++)
             {
                 var x = startX + i * (cardWidth + spacing);
-                var button = CreateCardButton(handRoot.transform, new Vector2(x, 0f), new Vector2(cardWidth, cardHeight), true);
+                var cardRoot = new GameObject($"CardRoot{i}", typeof(RectTransform));
+                cardRoot.transform.SetParent(handRoot.transform, false);
+                var cardRootRect = cardRoot.GetComponent<RectTransform>();
+                ConfigureRect(cardRootRect, new Vector2(x, 0f), new Vector2(cardWidth, cardHeight), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+                var button = CreateCardButton(cardRoot.transform, Vector2.zero, new Vector2(cardWidth, cardHeight), true);
                 _cardButtons.Add(button);
-                _cardRects.Add(button.GetComponent<RectTransform>());
+                _cardRects.Add(cardRootRect);
                 _cardAnchoredPositions.Add(new Vector2(x, 0f));
                 _cardBackgrounds.Add(button.GetComponent<Image>());
 
@@ -488,6 +508,12 @@ namespace AshenPath.Battle
                 description.textWrappingMode = TextWrappingModes.Normal;
                 description.overflowMode = TextOverflowModes.Truncate;
                 _cardDescriptionTexts.Add(description);
+
+                var parallaxEffect = button.GetComponent<CardParallaxEffect>();
+                if (parallaxEffect != null)
+                {
+                    parallaxEffect.BindPointerEnterAction(PlayCursorHoverSe);
+                }
             }
         }
 
@@ -632,6 +658,75 @@ namespace AshenPath.Battle
             image.sprite = GetSolidFillSprite();
             image.type = Image.Type.Simple;
             return image;
+        }
+
+        private void PlayCursorHoverSe()
+        {
+            if (_uiAudioSource == null)
+            {
+                return;
+            }
+
+            if (_cursorSeHandleInitialized && _cursorSeHandle.IsValid())
+            {
+                if (_cursorSeHandle.Status == AsyncOperationStatus.Succeeded && _cursorSeHandle.Result != null)
+                {
+                    _uiAudioSource.PlayOneShot(_cursorSeHandle.Result);
+                }
+
+                return;
+            }
+
+            _cursorSeHandleInitialized = false;
+
+            if (_cursorSeLoadRequested)
+            {
+                return;
+            }
+
+            _cursorSeLoadRequested = true;
+            _cursorSeLocationHandle = Addressables.LoadResourceLocationsAsync(CursorSeAddress, typeof(AudioClip));
+            _cursorSeLocationHandle.Completed += handle =>
+            {
+                _cursorSeLocationHandleInitialized = true;
+                if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null && handle.Result.Count > 0)
+                {
+                    LoadCursorSeFromKey(CursorSeAddress);
+                    return;
+                }
+
+                LoadCursorSeFromKey(CursorSeGuid);
+            };
+        }
+
+        private void LoadCursorSeFromKey(object key)
+        {
+            _cursorSeHandle = Addressables.LoadAssetAsync<AudioClip>(key);
+            _cursorSeHandle.Completed += handle =>
+            {
+                _cursorSeHandleInitialized = true;
+                _cursorSeLoadRequested = false;
+                if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null && _uiAudioSource != null)
+                {
+                    _uiAudioSource.PlayOneShot(handle.Result);
+                }
+            };
+        }
+
+        private void OnDestroy()
+        {
+            if (_cursorSeHandleInitialized && _cursorSeHandle.IsValid())
+            {
+                Addressables.Release(_cursorSeHandle);
+            }
+
+            if (_cursorSeLocationHandleInitialized && _cursorSeLocationHandle.IsValid())
+            {
+                Addressables.Release(_cursorSeLocationHandle);
+            }
+
+            _cursorSeHandleInitialized = false;
+            _cursorSeLocationHandleInitialized = false;
         }
 
         private IEnumerator ShakeRect(RectTransform rectTransform, Vector2 basePosition, float duration, float magnitude)
