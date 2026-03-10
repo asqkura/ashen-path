@@ -7,11 +7,12 @@ namespace AshenPath.Battle
     public class BattleController : MonoBehaviour
     {
         private const string CardCatalogResourcePath = "Battle/card-catalog";
+        private const string EnemyCatalogResourcePath = "Battle/enemy-catalog";
         private const int RequiredDeckSize = 15;
         private const int MaxHandSize = 5;
         private const int OpeningHandSize = 5;
         private const int TurnDrawCount = 2;
-        private const int MaxCardsPerTurn = 1;
+        private const int MaxCardsPerTurn = 3;
 
         private enum BattleState
         {
@@ -19,13 +20,6 @@ namespace AshenPath.Battle
             PlayerTurn,
             EnemyTurn,
             BattleEnded
-        }
-
-        private enum EnemyAction
-        {
-            Attack,
-            HeavyAttack,
-            Guard
         }
 
         [SerializeField] private float enemyTurnDelay = 0.9f;
@@ -48,12 +42,13 @@ namespace AshenPath.Battle
         private BattleState _state;
         private BattleUnit _playerUnit;
         private BattleUnit _enemyUnit;
+        private BattleEnemyData _enemyData;
         private BattleUI _battleUI;
         private Coroutine _enemyTurnCoroutine;
         private Coroutine _playerActionCoroutine;
         private int _turnCount;
         private int _cardsPlayedThisTurn;
-        private EnemyAction _nextEnemyAction;
+        private BattleEnemyActionData _nextEnemyAction;
         private readonly BattleDeckRuntime _deckRuntime = new();
         private BattleCardResolver _cardResolver;
         private BattleCardResolver.TurnEffectState _turnEffectState;
@@ -69,10 +64,11 @@ namespace AshenPath.Battle
             _battleUI = battleUI;
             _battleUI.Bind(this);
             LoadCardCatalog();
+            LoadEnemyCatalog();
             _deckRuntime.HandLimit = MaxHandSize;
             _deckRuntime.SetupDefaultDeck(RequiredDeckSize);
             _playerUnit = new BattleUnit(playerUnitData);
-            _enemyUnit = new BattleUnit(enemyUnitData);
+            _enemyUnit = new BattleUnit(GetEnemyUnitData());
             _cardResolver = new BattleCardResolver(_battleUI, _deckRuntime, _playerUnit, _enemyUnit, PerformAttack, RefreshUi);
             _battleUI.HideDeckEditor();
             _battleUI.SetBattleScreenVisible(true);
@@ -86,10 +82,11 @@ namespace AshenPath.Battle
             _battleUI = battleUI;
             _battleUI.Bind(this);
             LoadCardCatalog();
+            LoadEnemyCatalog();
             _deckRuntime.HandLimit = MaxHandSize;
             _deckRuntime.SetupDefaultDeck(RequiredDeckSize);
             _playerUnit = new BattleUnit(playerUnitData);
-            _enemyUnit = new BattleUnit(enemyUnitData);
+            _enemyUnit = new BattleUnit(GetEnemyUnitData());
             _cardResolver = new BattleCardResolver(_battleUI, _deckRuntime, _playerUnit, _enemyUnit, PerformAttack, RefreshUi);
             _state = BattleState.DeckEditing;
 
@@ -308,19 +305,16 @@ namespace AshenPath.Battle
             }
             else
             {
-                switch (_nextEnemyAction)
+                switch (_nextEnemyAction.actionType)
                 {
-                    case EnemyAction.Attack:
-                        PerformEnemyAttack(_enemyUnit.AttackPower, "Claw");
+                    case BattleEnemyActionType.Attack:
+                    case BattleEnemyActionType.HeavyAttack:
+                    case BattleEnemyActionType.Flurry:
+                        PerformEnemyActionAttack(_nextEnemyAction);
                         break;
-                    case EnemyAction.HeavyAttack:
-                        PerformEnemyAttack(_enemyUnit.AttackPower + 6, "Heavy Claw");
-                        break;
-                    case EnemyAction.Guard:
-                        _enemyUnit.AddBarrier(8);
-                        RefreshUi();
-                        _battleUI.SetTurnText($"{_enemyUnit.DisplayName} は身構えたぬめ");
-                        _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} はガードを 8 獲得");
+                    case BattleEnemyActionType.Guard:
+                    case BattleEnemyActionType.Focus:
+                        ApplyEnemyActionState(_nextEnemyAction);
                         break;
                 }
             }
@@ -336,11 +330,55 @@ namespace AshenPath.Battle
             StartPlayerTurn("プレイヤーのターンです");
         }
 
-        private void PerformEnemyAttack(int basePower, string attackName)
+        private void PerformEnemyActionAttack(BattleEnemyActionData actionData)
         {
-            var attackPower = Mathf.Max(0, basePower + _enemyUnit.ConsumePendingAttackModifier());
-            attackPower = Mathf.RoundToInt(attackPower * (_enemyUnit.ConsumePendingAttackMultiplierPercent() / 100f));
-            PerformAttack(_enemyUnit, _playerUnit, attackPower, attackName, ElementType.None);
+            if (actionData == null)
+            {
+                return;
+            }
+
+            var hitCount = Mathf.Max(1, actionData.hitCount);
+            for (var hitIndex = 0; hitIndex < hitCount; hitIndex++)
+            {
+                var attackPower = Mathf.Max(0, actionData.attackPower);
+                attackPower = Mathf.Max(0, attackPower + _enemyUnit.ConsumePendingAttackModifier());
+                attackPower = Mathf.RoundToInt(attackPower * (_enemyUnit.ConsumePendingAttackMultiplierPercent() / 100f));
+                var attackName = string.IsNullOrWhiteSpace(actionData.attackName) ? "Claw" : actionData.attackName;
+                PerformAttack(_enemyUnit, _playerUnit, attackPower, attackName, ElementType.None);
+                if (_playerUnit.IsDead)
+                {
+                    break;
+                }
+            }
+        }
+
+        private void ApplyEnemyActionState(BattleEnemyActionData actionData)
+        {
+            if (actionData == null)
+            {
+                return;
+            }
+
+            if (actionData.barrierGain > 0)
+            {
+                _enemyUnit.AddBarrier(actionData.barrierGain);
+            }
+
+            if (actionData.nextAttackMultiplierPercent > 100)
+            {
+                _enemyUnit.SetPendingAttackMultiplierPercent(actionData.nextAttackMultiplierPercent);
+            }
+
+            RefreshUi();
+            if (actionData.actionType == BattleEnemyActionType.Focus)
+            {
+                _battleUI.SetTurnText($"{_enemyUnit.DisplayName} は力を溜めているぬめ");
+                _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} は次の攻撃を強化し、ガードを {Mathf.Max(0, actionData.barrierGain)} 獲得");
+                return;
+            }
+
+            _battleUI.SetTurnText($"{_enemyUnit.DisplayName} は身構えたぬめ");
+            _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} はガードを {Mathf.Max(0, actionData.barrierGain)} 獲得");
         }
 
         private void PerformAttack(BattleUnit attacker, BattleUnit defender, int damage, string attackName, ElementType elementType, int extraShieldDamage = 0)
@@ -438,36 +476,52 @@ namespace AshenPath.Battle
             return playable;
         }
 
-        private static EnemyAction RollEnemyAction()
+        private BattleEnemyActionData RollEnemyAction()
         {
-            var roll = Random.Range(0, 100);
-            if (roll < 40)
+            var actions = _enemyData?.actions;
+            if (actions == null || actions.Count == 0)
             {
-                return EnemyAction.Attack;
+                return CreateFallbackEnemyAction();
             }
 
-            if (roll < 75)
+            var totalWeight = 0;
+            for (var i = 0; i < actions.Count; i++)
             {
-                return EnemyAction.HeavyAttack;
+                totalWeight += GetEnemyActionWeight(actions[i]);
             }
 
-            return EnemyAction.Guard;
+            if (totalWeight <= 0)
+            {
+                return CreateFallbackEnemyAction();
+            }
+
+            var roll = Random.Range(0, totalWeight);
+            for (var i = 0; i < actions.Count; i++)
+            {
+                var weight = GetEnemyActionWeight(actions[i]);
+                if (roll < weight)
+                {
+                    return actions[i];
+                }
+
+                roll -= weight;
+            }
+
+            return actions[actions.Count - 1];
         }
 
-        private string GetEnemyIntentLabel(EnemyAction action)
+        private string GetEnemyIntentLabel(BattleEnemyActionData action)
         {
             if (_enemyUnit != null && _enemyUnit.WillSkipNextAction)
             {
                 return $"予告: 凍結停止 ({_enemyUnit.FreezeStack}/{_enemyUnit.FreezeThreshold})";
             }
 
-            var baseLabel = action switch
-            {
-                EnemyAction.Attack => "予告: 通常攻撃",
-                EnemyAction.HeavyAttack => "予告: 強攻撃",
-                EnemyAction.Guard => "予告: 防御",
-                _ => string.Empty
-            };
+            var baseLabel = action == null
+                ? string.Empty
+                : string.IsNullOrWhiteSpace(action.intentLabel)
+                    ? GetFallbackIntentLabel(action)
+                    : action.intentLabel;
 
             if (_enemyUnit != null && _enemyUnit.FreezeStack > 0)
             {
@@ -488,9 +542,104 @@ namespace AshenPath.Battle
             _deckRuntime.ReplaceCatalog(BattleCardCatalogLoader.LoadFromResources(CardCatalogResourcePath));
         }
 
+        private void LoadEnemyCatalog()
+        {
+            try
+            {
+                var enemies = BattleEnemyCatalogLoader.LoadFromResources(EnemyCatalogResourcePath);
+                _enemyData = enemies.Count > 0 ? enemies[0] : CreateFallbackEnemyData();
+            }
+            catch
+            {
+                _enemyData = CreateFallbackEnemyData();
+            }
+        }
+
         private void RemoveCardFromBattleDeck(BattleCardData card)
         {
             _deckRuntime.RemoveCardFromBattleDeck(card);
+        }
+
+        private BattleUnitData GetEnemyUnitData()
+        {
+            return _enemyData?.unitData ?? enemyUnitData;
+        }
+
+        private int GetEnemyActionWeight(BattleEnemyActionData action)
+        {
+            if (action == null)
+            {
+                return 0;
+            }
+
+            var weight = Mathf.Max(0, action.baseWeight);
+            if (_enemyUnit != null && _enemyUnit.MaxHp > 0 && _enemyUnit.CurrentHp <= Mathf.RoundToInt(_enemyUnit.MaxHp * 0.4f))
+            {
+                weight += Mathf.Max(0, action.lowHpBonusWeight);
+            }
+
+            if (_enemyUnit != null && _enemyUnit.PendingAttackMultiplierPercent > 100)
+            {
+                weight += Mathf.Max(0, action.chargedBonusWeight);
+            }
+
+            return weight;
+        }
+
+        private static string GetFallbackIntentLabel(BattleEnemyActionData action)
+        {
+            if (action == null)
+            {
+                return string.Empty;
+            }
+
+            return action.actionType switch
+            {
+                BattleEnemyActionType.Attack => $"予告: 通常攻撃 {Mathf.Max(0, action.attackPower)}",
+                BattleEnemyActionType.HeavyAttack => $"予告: 強攻撃 {Mathf.Max(0, action.attackPower)}",
+                BattleEnemyActionType.Guard => $"予告: 防御 {Mathf.Max(0, action.barrierGain)}",
+                BattleEnemyActionType.Flurry => $"予告: 連撃 {Mathf.Max(0, action.attackPower)}x{Mathf.Max(1, action.hitCount)}",
+                BattleEnemyActionType.Focus => $"予告: 溜め / 次攻撃{x(action.nextAttackMultiplierPercent)} + ガード{Mathf.Max(0, action.barrierGain)}",
+                _ => string.Empty
+            };
+        }
+
+        private static string x(int percent)
+        {
+            return $"{Mathf.Max(100, percent)}%";
+        }
+
+        private BattleEnemyActionData CreateFallbackEnemyAction()
+        {
+            return new BattleEnemyActionData
+            {
+                actionType = BattleEnemyActionType.Attack,
+                intentLabel = $"予告: 通常攻撃 {Mathf.Max(0, GetEnemyUnitData().attackPower)}",
+                attackName = "Claw",
+                attackPower = Mathf.Max(0, GetEnemyUnitData().attackPower),
+                baseWeight = 1,
+                hitCount = 1
+            };
+        }
+
+        private BattleEnemyData CreateFallbackEnemyData()
+        {
+            return new BattleEnemyData
+            {
+                id = "fallback_enemy",
+                unitData = enemyUnitData,
+                actions = new List<BattleEnemyActionData>
+                {
+                    new()
+                    {
+                        actionType = BattleEnemyActionType.Attack,
+                        intentLabel = $"予告: 通常攻撃 {Mathf.Max(0, enemyUnitData.attackPower)}",
+                        attackName = "Claw",
+                        attackPower = Mathf.Max(0, enemyUnitData.attackPower),
+                        baseWeight = 10
+                    }
+                }
+            };
         }
 
         private static bool HasKeyword(BattleCardData card, BattleCardKeywordType keywordType)

@@ -1,0 +1,77 @@
+{
+  "enemies": [
+    {
+      "id": "ashen_beast",
+      "unitData": {
+        "displayName": "Ashen Beast",
+        "maxHp": 52,
+        "attackPower": 8,
+        "maxSp": 0,
+        "spRecoveryPerTurn": 0,
+        "weakElement": "None"
+      },
+      "actions": [
+        {
+          "actionType": "Attack",
+          "intentLabel": "予告: 通常攻撃 8",
+          "attackName": "Claw",
+          "baseWeight": 24,
+          "lowHpBonusWeight": 0,
+          "chargedBonusWeight": 0,
+          "attackPower": 8,
+          "hitCount": 1,
+          "barrierGain": 0,
+          "nextAttackMultiplierPercent": 100
+        },
+        {
+          "actionType": "HeavyAttack",
+          "intentLabel": "予告: 強攻撃 14",
+          "attackName": "Heavy Claw",
+          "baseWeight": 18,
+          "lowHpBonusWeight": 10,
+          "chargedBonusWeight": 18,
+          "attackPower": 14,
+          "hitCount": 1,
+          "barrierGain": 0,
+          "nextAttackMultiplierPercent": 100
+        },
+        {
+          "actionType": "Guard",
+          "intentLabel": "予告: 防御 8",
+          "attackName": "",
+          "baseWeight": 16,
+          "lowHpBonusWeight": 4,
+          "chargedBonusWeight": 0,
+          "attackPower": 0,
+          "hitCount": 1,
+          "barrierGain": 8,
+          "nextAttackMultiplierPercent": 100
+        },
+        {
+          "actionType": "Flurry",
+          "intentLabel": "予告: 連撃 6x2",
+          "attackName": "Twin Claw",
+          "baseWeight": 14,
+          "lowHpBonusWeight": 10,
+          "chargedBonusWeight": 14,
+          "attackPower": 6,
+          "hitCount": 2,
+          "barrierGain": 0,
+          "nextAttackMultiplierPercent": 100
+        },
+        {
+          "actionType": "Focus",
+          "intentLabel": "予告: 溜め / 次攻撃170% + ガード4",
+          "attackName": "",
+          "baseWeight": 10,
+          "lowHpBonusWeight": 18,
+          "chargedBonusWeight": -10,
+          "attackPower": 0,
+          "hitCount": 1,
+          "barrierGain": 4,
+          "nextAttackMultiplierPercent": 170
+        }
+      ]
+    }
+  ]
+}

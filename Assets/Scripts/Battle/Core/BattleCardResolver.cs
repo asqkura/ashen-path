@@ -215,6 +215,44 @@ namespace AshenPath.Battle
                                 currentDamage += Mathf.Max(0, effect.secondaryValue);
                             }
                             break;
+                        case BattleCardEffectType.MultiplyDamageIfCardSequenceAtLeast:
+                            if (sequenceIndex >= Mathf.Max(1, effect.value))
+                            {
+                                damageMultiplierPercent = Mathf.RoundToInt(damageMultiplierPercent * (Mathf.Max(100, effect.secondaryValue) / 100f));
+                            }
+                            break;
+                        case BattleCardEffectType.MultiplyDamageIfPlayerHpAtMostPercent:
+                            if (_playerUnit.CurrentHp * 100 <= _playerUnit.MaxHp * Mathf.Max(0, effect.value))
+                            {
+                                damageMultiplierPercent = Mathf.RoundToInt(damageMultiplierPercent * (Mathf.Max(100, effect.secondaryValue) / 100f));
+                            }
+                            break;
+                        case BattleCardEffectType.MultiplyDamageIfPlayerLostHpThisTurn:
+                            if (effectState.PlayerLostHpThisTurn)
+                            {
+                                damageMultiplierPercent = Mathf.RoundToInt(damageMultiplierPercent * (Mathf.Max(100, effect.value) / 100f));
+                            }
+                            break;
+                        case BattleCardEffectType.BonusDamageIfPlayerLostHpThisTurn:
+                            if (effectState.PlayerLostHpThisTurn)
+                            {
+                                currentDamage += Mathf.Max(0, effect.value);
+                            }
+                            break;
+                        case BattleCardEffectType.DiscardHandDamage:
+                            currentDamage = _deckRuntime.DiscardHandAndCount(card.id) * Mathf.Max(0, effect.value);
+                            break;
+                        case BattleCardEffectType.RepeatAttackPerUsedElement:
+                            repeatEffects.Add(new BattleCardEffectData
+                            {
+                                effectType = BattleCardEffectType.RepeatAttack,
+                                value = Mathf.Max(0, effect.value),
+                                secondaryValue = Mathf.Max(0, effectState.GetUsedElementCount(card.elementType) - 1)
+                            });
+                            break;
+                        case BattleCardEffectType.BonusDamageFromBattleElementBonus:
+                            currentDamage += GetBattleElementDamageBonus(card.elementType) * Mathf.Max(0, effect.value);
+                            break;
                         case BattleCardEffectType.RepeatAttack:
                             repeatEffects.Add(effect);
                             break;
@@ -224,52 +262,8 @@ namespace AshenPath.Battle
 
             switch (card.id)
             {
-                case "fire_ignition":
-                    if (sequenceIndex >= 2)
-                    {
-                        damageMultiplierPercent *= 2;
-                    }
-                    break;
-                case "fire_inferno":
-                    if (_playerUnit.CurrentHp * 2 <= _playerUnit.MaxHp)
-                    {
-                        damageMultiplierPercent = Mathf.RoundToInt(damageMultiplierPercent * 1.5f);
-                    }
-                    break;
-                case "fire_volcano":
-                    currentDamage += GetBattleElementDamageBonus(ElementType.Fire) * 2;
-                    break;
-                case "wind_zephyr":
-                    repeatEffects.Add(new BattleCardEffectData
-                    {
-                        effectType = BattleCardEffectType.RepeatAttack,
-                        value = 5,
-                        secondaryValue = Mathf.Max(0, effectState.GetUsedElementCount(ElementType.Wind) - 1)
-                    });
-                    break;
-                case "light_judge":
-                    currentDamage = _playerUnit.CurrentHp;
-                    break;
-                case "dark_grim":
-                    currentDamage = _deckRuntime.DiscardHandAndCount("dark_grim") * 5;
-                    break;
-                case "dark_nox":
-                    if (effectState.PlayerLostHpThisTurn)
-                    {
-                        damageMultiplierPercent *= 3;
-                    }
-                    break;
-                case "dark_reaper":
-                    if (effectState.PlayerLostHpThisTurn)
-                    {
-                        currentDamage += 18;
-                    }
-                    break;
-                case "dark_abyss":
-                    if (effectState.PlayerLostHpThisTurn)
-                    {
-                        currentDamage += 8;
-                    }
+                case "dark_crow":
+                    effectState.AddNextElementDamageMultiplierPercent(ElementType.Dark, 150);
                     break;
             }
 
@@ -385,6 +379,17 @@ namespace AshenPath.Battle
                             _enemyUnit.AddPendingAttackModifier(-Mathf.Max(0, effect.value));
                             _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} の次の攻撃が弱まったぬめ");
                             break;
+                        case BattleCardEffectType.DrawCards:
+                            _deckRuntime.DrawCardsIntoHand(Mathf.Max(0, effect.value));
+                            _battleUI.AddBattleLog($"カードを {Mathf.Max(0, effect.value)} 枚引いたぬめ");
+                            break;
+                        case BattleCardEffectType.DrawCardsIfPlayerLostHpThisTurn:
+                            if (effectState.PlayerLostHpThisTurn)
+                            {
+                                _deckRuntime.DrawCardsIntoHand(Mathf.Max(0, effect.value));
+                                _battleUI.AddBattleLog($"協約が満たされ、カードを {Mathf.Max(0, effect.value)} 枚引いたぬめ");
+                            }
+                            break;
                     }
                 }
             }
@@ -393,24 +398,17 @@ namespace AshenPath.Battle
 
             if (card.id == "dark_crow")
             {
-                effectState.AddNextElementDamageMultiplierPercent(ElementType.Dark, 150);
                 _battleUI.AddBattleLog("次の闇カードの威力が大きく上がったぬめ");
             }
 
             switch (card.id)
             {
-                case "neutral_draw":
-                    _deckRuntime.DrawCardsIntoHand(2);
-                    break;
                 case "fire_ash":
                     var recoveredCard = _deckRuntime.ReturnLastExhaustedCardToHand();
                     if (recoveredCard != null)
                     {
                         _battleUI.AddBattleLog($"{recoveredCard.cardName} が手札に戻ったぬめ");
                     }
-                    break;
-                case "ice_crystal":
-                    _deckRuntime.DrawCardsIntoHand(1);
                     break;
                 case "wind_step":
                     effectState.TurnWideSpDiscount += 1;
@@ -421,19 +419,12 @@ namespace AshenPath.Battle
                     {
                         _battleUI.AddBattleLog("手札を1枚捨てたぬめ");
                     }
-                    _deckRuntime.DrawCardsIntoHand(2);
+                    _deckRuntime.DrawCardsIntoHand(3);
                     break;
                 case "light_sunlight":
                     var healFromDamage = Mathf.FloorToInt(Mathf.Max(0, currentDamage) * 0.5f);
                     var lifeSteal = _playerUnit.Heal(healFromDamage);
                     _battleUI.AddBattleLog($"{_playerUnit.DisplayName} はHPを {lifeSteal} 回復");
-                    break;
-                case "dark_abyss":
-                    if (effectState.PlayerLostHpThisTurn)
-                    {
-                        _deckRuntime.DrawCardsIntoHand(1);
-                        _battleUI.AddBattleLog("協約が満たされ、カードを1枚引いたぬめ");
-                    }
                     break;
             }
         }

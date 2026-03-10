@@ -831,7 +831,7 @@ namespace AshenPath.Battle
             var totalWidth = columns * cardWidth + (columns - 1) * spacingX;
             var startX = -totalWidth * 0.5f + cardWidth * 0.5f;
 
-            for (var i = 0; i < 60; i++)
+            for (var i = 0; i < 72; i++)
             {
                 var row = i / columns;
                 var column = i % columns;

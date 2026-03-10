@@ -18,7 +18,16 @@ namespace AshenPath.Battle
         ExtraShieldDamage,
         BonusDamageIfTargetBroken,
         BonusDamageIfCardSequenceAtLeast,
-        BonusDamageIfHandCountAtMost
+        BonusDamageIfHandCountAtMost,
+        MultiplyDamageIfCardSequenceAtLeast,
+        MultiplyDamageIfPlayerHpAtMostPercent,
+        MultiplyDamageIfPlayerLostHpThisTurn,
+        BonusDamageIfPlayerLostHpThisTurn,
+        DrawCards,
+        DrawCardsIfPlayerLostHpThisTurn,
+        DiscardHandDamage,
+        RepeatAttackPerUsedElement,
+        BonusDamageFromBattleElementBonus
     }
 
     public enum BattleCardKeywordType

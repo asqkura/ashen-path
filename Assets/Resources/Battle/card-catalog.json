@@ -47,7 +47,13 @@
       "damage": 0,
       "spCost": 1,
       "elementType": "None",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "DrawCards",
+          "value": 2,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "neutral_brave",
@@ -178,7 +184,13 @@
       "damage": 5,
       "spCost": 1,
       "elementType": "Fire",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "MultiplyDamageIfCardSequenceAtLeast",
+          "value": 2,
+          "secondaryValue": 200
+        }
+      ]
     },
     {
       "id": "fire_flare",
@@ -196,7 +208,13 @@
       "damage": 18,
       "spCost": 4,
       "elementType": "Fire",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "MultiplyDamageIfPlayerHpAtMostPercent",
+          "value": 50,
+          "secondaryValue": 150
+        }
+      ]
     },
     {
       "id": "fire_ash",
@@ -220,11 +238,17 @@
     {
       "id": "fire_volcano",
       "cardName": "ボルカノ",
-      "description": "敵単体に30ダメージを与える。熾火1につきさらに2ダメージを与える。",
-      "damage": 30,
+      "description": "敵単体に22ダメージを与える。熾火1につきさらに2ダメージを与える。",
+      "damage": 22,
       "spCost": 5,
       "elementType": "Fire",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "BonusDamageFromBattleElementBonus",
+          "value": 2,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "ice_snow",
@@ -296,6 +320,27 @@
       ]
     },
     {
+      "id": "ice_hush",
+      "cardName": "ハッシュ",
+      "description": "敵に凍結を2付与する。敵の次の攻撃を4下げ、カードを1枚引く。",
+      "keywords": [{ "keywordType": "Freeze", "value": 2 }],
+      "damage": 0,
+      "spCost": 2,
+      "elementType": "Ice",
+      "effects": [
+        {
+          "effectType": "EnemyAttackDown",
+          "value": 4,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "DrawCards",
+          "value": 1,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
       "id": "ice_blizzard",
       "cardName": "ブリザド",
       "description": "敵単体に14ダメージを与える。",
@@ -315,6 +360,11 @@
         {
           "effectType": "GainBarrier",
           "value": 4,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "DrawCards",
+          "value": 1,
           "secondaryValue": 0
         }
       ]
@@ -436,7 +486,13 @@
       "damage": 5,
       "spCost": 3,
       "elementType": "Wind",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "RepeatAttackPerUsedElement",
+          "value": 5,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "light_light",
@@ -525,6 +581,27 @@
       ]
     },
     {
+      "id": "light_shelter",
+      "cardName": "シェルター",
+      "description": "自身にガード9を付与し、HPを4回復する。啓示を得る。",
+      "keywords": [{ "keywordType": "Revelation", "value": 0 }],
+      "damage": 0,
+      "spCost": 2,
+      "elementType": "Light",
+      "effects": [
+        {
+          "effectType": "GainBarrier",
+          "value": 9,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "Heal",
+          "value": 4,
+          "secondaryValue": 0
+        }
+      ]
+    },
+    {
       "id": "light_sunlight",
       "cardName": "サンライト",
       "description": "敵単体に18ダメージを与える。与えたダメージの50%分、自身のHPを回復する。【啓示】なら、次に使うカード1枚のダメージを+6する。",
@@ -547,9 +624,9 @@
     {
       "id": "light_judge",
       "cardName": "ジャッジ",
-      "description": "敵単体に「自身の現在HP」と同値のダメージを与える。啓示を得る。",
+      "description": "敵単体に24ダメージを与える。啓示を得る。",
       "keywords": [{ "keywordType": "Revelation", "value": 0 }, { "keywordType": "Exhaust", "value": 0 }],
-      "damage": 0,
+      "damage": 24,
       "spCost": 4,
       "elementType": "Light",
       "effects": []
@@ -608,7 +685,13 @@
       "damage": 0,
       "spCost": 1,
       "elementType": "Dark",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "DiscardHandDamage",
+          "value": 5,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "dark_night",
@@ -627,7 +710,13 @@
       "damage": 10,
       "spCost": 2,
       "elementType": "Dark",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "MultiplyDamageIfPlayerLostHpThisTurn",
+          "value": 300,
+          "secondaryValue": 0
+        }
+      ]
     },
     {
       "id": "dark_abyss",
@@ -641,6 +730,11 @@
         {
           "effectType": "SelfDamage",
           "value": 3,
+          "secondaryValue": 0
+        },
+        {
+          "effectType": "DrawCardsIfPlayerLostHpThisTurn",
+          "value": 1,
           "secondaryValue": 0
         }
       ]
@@ -658,12 +752,18 @@
     {
       "id": "dark_reaper",
       "cardName": "リーパー",
-      "description": "敵単体に40ダメージを与える。【協約】ならさらに18ダメージを与える。",
+      "description": "敵単体に28ダメージを与える。【協約】ならさらに12ダメージを与える。",
       "keywords": [{ "keywordType": "Covenant", "value": 0 }],
-      "damage": 40,
+      "damage": 28,
       "spCost": 4,
       "elementType": "Dark",
-      "effects": []
+      "effects": [
+        {
+          "effectType": "BonusDamageIfPlayerLostHpThisTurn",
+          "value": 12,
+          "secondaryValue": 0
+        }
+      ]
     }
   ]
 }
