@@ -35,6 +35,7 @@ namespace AshenPath.Battle
         public string id = "attack";
         public string cardName = "Strike";
         public string description = "Basic attack.";
+        public List<string> keywords = new();
         public int damage = 8;
         public int spCost = 1;
         public ElementType elementType = ElementType.None;
@@ -56,6 +57,7 @@ namespace AshenPath.Battle
         public string id;
         public string cardName;
         public string description;
+        public List<string> keywords = new();
         public int damage;
         public int spCost;
         public string elementType;

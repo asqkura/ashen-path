@@ -371,7 +371,7 @@ namespace AshenPath.Battle
             _selectedCardIndices.Clear();
             var previousSp = _playerUnit.CurrentSp;
             _playerUnit.RecoverSp(_playerUnit.SpRecoveryPerTurn);
-            _deckRuntime.DrawNewTurnHand(HandSize);
+            _deckRuntime.RefillHand(HandSize);
             _battleUI.RefreshHand(_deckRuntime.Hand);
             _battleUI.SetTurnText(turnMessage);
             _battleUI.SetTurnCount(_turnCount);

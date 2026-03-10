@@ -102,15 +102,10 @@ namespace AshenPath.Battle
             ShuffleCards(_drawPile);
         }
 
-        public void DrawNewTurnHand(int handSize)
+        public void RefillHand(int handSize)
         {
-            for (var i = 0; i < _hand.Count; i++)
-            {
-                _discardPile.Add(_hand[i]);
-            }
-
-            _hand.Clear();
-            DrawCardsIntoHand(handSize);
+            var drawCount = Mathf.Max(0, handSize - _hand.Count);
+            DrawCardsIntoHand(drawCount);
         }
 
         public void FinalizePlayedCard(BattleCardData card)

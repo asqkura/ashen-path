@@ -306,7 +306,7 @@ namespace AshenPath.Battle
                 }
 
                 _cardTitleTexts[i].text = hand[i].cardName;
-                _cardDescriptionTexts[i].text = hand[i].description;
+                _cardDescriptionTexts[i].text = FormatCardDescription(hand[i]);
                 _cardCostTexts[i].text = $"[{hand[i].spCost}]{GetElementLabel(hand[i].elementType)}";
                 _cardElementTexts[i].text = string.Empty;
             }
@@ -793,10 +793,46 @@ namespace AshenPath.Battle
 
                 _deckCardTitleTexts[i].text = cards[i].cardName;
                 _deckCardCostTexts[i].text = $"[{cards[i].spCost}]{GetElementLabel(cards[i].elementType)}";
-                _deckCardDescriptionTexts[i].text = cards[i].description;
+                _deckCardDescriptionTexts[i].text = FormatCardDescription(cards[i]);
                 _deckCardBackgrounds[i].color = GetElementColor(cards[i].elementType);
                 _deckCardOutlines[i].enabled = false;
             }
+        }
+
+        private static string FormatCardDescription(BattleCardData card)
+        {
+            if (card == null)
+            {
+                return string.Empty;
+            }
+
+            if (card.keywords == null || card.keywords.Count == 0)
+            {
+                return card.description;
+            }
+
+            return $"{FormatKeywords(card.keywords)}\n{card.description}";
+        }
+
+        private static string FormatKeywords(IReadOnlyList<string> keywords)
+        {
+            if (keywords == null || keywords.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var formatted = new List<string>(keywords.Count);
+            for (var i = 0; i < keywords.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(keywords[i]))
+                {
+                    continue;
+                }
+
+                formatted.Add($"【{keywords[i].Replace(" ", "：")}】");
+            }
+
+            return string.Join(" ", formatted);
         }
 
         private GameObject CreateActor(Transform parent, string actorName, Vector2 anchoredPosition, Color accentColor, string label)

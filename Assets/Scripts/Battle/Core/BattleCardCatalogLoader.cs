@@ -41,6 +41,7 @@ namespace AshenPath.Battle
                 id = string.IsNullOrWhiteSpace(source.id) ? source.cardName : source.id,
                 cardName = source.cardName,
                 description = source.description,
+                keywords = source.keywords ?? new List<string>(),
                 damage = source.damage,
                 spCost = source.spCost,
                 elementType = ParseElementType(source.elementType),
