@@ -11,6 +11,7 @@ namespace AshenPath.Battle
         public string description = "Basic attack.";
         public int damage = 8;
         public int spCost = 1;
+        public ElementType elementType = ElementType.None;
         public bool exhaustAfterUse;
     }
 
@@ -45,13 +46,13 @@ namespace AshenPath.Battle
         };
         [SerializeField] private List<BattleCardData> cardPool = new()
         {
-            new BattleCardData { cardName = "Slash", description = "斬撃で 8 ダメージ", damage = 8, spCost = 2 },
-            new BattleCardData { cardName = "Pierce", description = "貫通攻撃で 7 ダメージ", damage = 7, spCost = 1 },
-            new BattleCardData { cardName = "Smash", description = "重い一撃で 10 ダメージ", damage = 10, spCost = 3 },
-            new BattleCardData { cardName = "Twin Fang", description = "素早い連撃で 6 ダメージ", damage = 6, spCost = 1 },
-            new BattleCardData { cardName = "Moon Edge", description = "深い斬り込みで 9 ダメージ", damage = 9, spCost = 2 },
-            new BattleCardData { cardName = "Ash Burst", description = "灰の爆ぜで 11 ダメージ", damage = 11, spCost = 4, exhaustAfterUse = true },
-            new BattleCardData { cardName = "Needle", description = "細い突きで 5 ダメージ", damage = 5, spCost = 1 },
+            new BattleCardData { cardName = "Slash", description = "斬撃で 8 ダメージ", damage = 8, spCost = 2, elementType = ElementType.None },
+            new BattleCardData { cardName = "Pierce", description = "貫通攻撃で 7 ダメージ", damage = 7, spCost = 1, elementType = ElementType.Wind },
+            new BattleCardData { cardName = "Smash", description = "重い一撃で 10 ダメージ", damage = 10, spCost = 3, elementType = ElementType.Fire },
+            new BattleCardData { cardName = "Twin Fang", description = "素早い連撃で 6 ダメージ", damage = 6, spCost = 1, elementType = ElementType.Wind },
+            new BattleCardData { cardName = "Moon Edge", description = "深い斬り込みで 9 ダメージ", damage = 9, spCost = 2, elementType = ElementType.Water },
+            new BattleCardData { cardName = "Ash Burst", description = "灰の爆ぜで 11 ダメージ", damage = 11, spCost = 4, elementType = ElementType.Fire, exhaustAfterUse = true },
+            new BattleCardData { cardName = "Needle", description = "細い突きで 5 ダメージ", damage = 5, spCost = 1, elementType = ElementType.Water },
         };
 
         private BattleState _state;
@@ -70,6 +71,8 @@ namespace AshenPath.Battle
 
             _playerUnit = new BattleUnit(playerUnitData);
             _enemyUnit = new BattleUnit(enemyUnitData);
+            _enemyUnit.SetWeakElement(GetRandomWeakElement());
+            _enemyUnit.SetShieldCount(Random.Range(3, 6));
             _state = BattleState.PlayerTurn;
             _turnCount = 0;
 
@@ -139,7 +142,7 @@ namespace AshenPath.Battle
 
                 RefreshUi();
                 _battleUI.AddBattleLog($"{_playerUnit.DisplayName} は {selectedCard.cardName} を使用");
-                PerformAttack(_playerUnit, _enemyUnit, selectedCard.damage, selectedCard.cardName);
+                PerformAttack(_playerUnit, _enemyUnit, selectedCard.damage, selectedCard.cardName, selectedCard.elementType);
 
                 if (selectedCard.exhaustAfterUse)
                 {
@@ -169,10 +172,20 @@ namespace AshenPath.Battle
                 yield break;
             }
 
+            if (_enemyUnit.IsBroken)
+            {
+                _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} は Break 中で行動不能ぬめ！");
+                _enemyUnit.EndBreak();
+                RefreshUi();
+                _battleUI.AddBattleLog($"{_enemyUnit.DisplayName} のシールドが回復したぬめ");
+                StartPlayerTurn("プレイヤーのターンです");
+                yield break;
+            }
+
             switch (ChooseEnemyAction())
             {
                 case EnemyAction.Attack:
-                    PerformAttack(_enemyUnit, _playerUnit, _enemyUnit.AttackPower, "Claw");
+                    PerformAttack(_enemyUnit, _playerUnit, _enemyUnit.AttackPower, "Claw", ElementType.None);
                     break;
             }
 
@@ -222,10 +235,26 @@ namespace AshenPath.Battle
             }
         }
 
-        private void PerformAttack(BattleUnit attacker, BattleUnit defender, int damage, string attackName)
+        private void PerformAttack(BattleUnit attacker, BattleUnit defender, int damage, string attackName, ElementType elementType)
         {
-            var dealtDamage = defender.TakeDamage(damage);
+            var wasBroken = defender.IsBroken;
+            if (defender.TryBreakShield(elementType))
+            {
+                _battleUI.AddBattleLog("弱点を突いてシールドを削ったぬめ！");
+                if (defender.IsBroken)
+                {
+                    _battleUI.AddBattleLog($"{defender.DisplayName} は Break 状態ぬめ！");
+                }
+            }
+
+            var dealtDamage = wasBroken ? damage * 2 : damage;
+            dealtDamage = defender.TakeDamage(dealtDamage);
             RefreshUi();
+            if (defender == _enemyUnit)
+            {
+                _battleUI.PlayEnemyDamageEffect(dealtDamage);
+            }
+
             var message = $"{attacker.DisplayName} の {attackName}！ {defender.DisplayName} に {dealtDamage} ダメージ";
             _battleUI.SetTurnText(message);
             _battleUI.AddBattleLog(message);
@@ -285,6 +314,11 @@ namespace AshenPath.Battle
             }
 
             return total;
+        }
+
+        private static ElementType GetRandomWeakElement()
+        {
+            return (ElementType)Random.Range(1, 4);
         }
     }
 }

@@ -9,6 +9,7 @@ namespace AshenPath.Battle
             Data = data ?? new BattleUnitData();
             CurrentHp = Mathf.Clamp(Data.maxHp, 0, Data.maxHp);
             CurrentSp = Mathf.Clamp(MaxSp, 0, MaxSp);
+            WeakElement = Data.weakElement;
         }
 
         public BattleUnitData Data { get; }
@@ -29,10 +30,23 @@ namespace AshenPath.Battle
 
         public int SpRecoveryPerTurn => Mathf.Max(0, Data.spRecoveryPerTurn);
 
+        public ElementType WeakElement { get; private set; }
+
+        public int ShieldCount { get; private set; }
+
+        public int MaxShieldCount { get; private set; }
+
+        public bool IsBroken => BreakTurnsRemaining > 0;
+
+        public int BreakTurnsRemaining { get; private set; }
+
         public void Reset()
         {
             CurrentHp = MaxHp;
             CurrentSp = MaxSp;
+            WeakElement = Data.weakElement;
+            ShieldCount = MaxShieldCount;
+            BreakTurnsRemaining = 0;
         }
 
         public int TakeDamage(int amount)
@@ -63,6 +77,40 @@ namespace AshenPath.Battle
 
             CurrentSp -= cost;
             return true;
+        }
+
+        public void SetWeakElement(ElementType elementType)
+        {
+            WeakElement = elementType;
+        }
+
+        public void SetShieldCount(int shieldCount)
+        {
+            MaxShieldCount = Mathf.Max(0, shieldCount);
+            ShieldCount = MaxShieldCount;
+            BreakTurnsRemaining = 0;
+        }
+
+        public bool TryBreakShield(ElementType attackElement)
+        {
+            if (IsBroken || ShieldCount <= 0 || attackElement == ElementType.None || attackElement != WeakElement)
+            {
+                return false;
+            }
+
+            ShieldCount = Mathf.Max(0, ShieldCount - 1);
+            if (ShieldCount == 0)
+            {
+                BreakTurnsRemaining = 1;
+            }
+
+            return true;
+        }
+
+        public void EndBreak()
+        {
+            BreakTurnsRemaining = 0;
+            ShieldCount = MaxShieldCount;
         }
     }
 }

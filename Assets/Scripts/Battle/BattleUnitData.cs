@@ -10,5 +10,6 @@ namespace AshenPath.Battle
         public int attackPower = 8;
         public int maxSp = 3;
         public int spRecoveryPerTurn = 2;
+        public ElementType weakElement = ElementType.None;
     }
 }

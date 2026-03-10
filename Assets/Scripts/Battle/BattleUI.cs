@@ -1,13 +1,14 @@
+using System.Collections.Generic;
+using System.Collections;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
-using System.Text;
 namespace AshenPath.Battle
 {
     public class BattleUI : MonoBehaviour
     {
-        private static readonly Vector2 EnemyPanelSize = new(440f, 150f);
+        private static readonly Vector2 EnemyPanelSize = new(440f, 182f);
         private static readonly Vector2 PlayerPanelSize = new(440f, 220f);
         private static readonly Vector2 StatusBarSize = new(392f, 52f);
         private static readonly Vector2 ArenaSize = new(1360f, 500f);
@@ -24,12 +25,14 @@ namespace AshenPath.Battle
         private static readonly Color EnemyAccent = new(0.76f, 0.32f, 0.32f, 1f);
         private static readonly Color PlayerAccent = new(0.32f, 0.72f, 0.58f, 1f);
         private static readonly Color SpAccent = new(0.36f, 0.64f, 0.96f, 1f);
+        private static readonly Color ShieldAccent = new(0.95f, 0.95f, 0.95f, 1f);
         private static readonly Color TextColor = new(0.95f, 0.96f, 0.98f, 1f);
         private static readonly Color ArenaColor = new(0.12f, 0.13f, 0.16f, 0.92f);
         private static readonly Color CardColor = new(0.88f, 0.82f, 0.68f, 1f);
         private static readonly Color CardSelectedColor = new(0.97f, 0.88f, 0.62f, 1f);
         private static readonly Color CardDisabledColor = new(0.35f, 0.35f, 0.35f, 0.95f);
         private static readonly Color DarkTextColor = new(0.17f, 0.13f, 0.09f, 1f);
+        private static readonly Color DamagePopupColor = new(1f, 0.86f, 0.42f, 1f);
 
         private TMP_FontAsset _font;
         private TextMeshProUGUI _turnText;
@@ -42,6 +45,9 @@ namespace AshenPath.Battle
         private TextMeshProUGUI _enemyNameText;
         private TextMeshProUGUI _enemyHpText;
         private Image _enemyHpFill;
+        private TextMeshProUGUI _enemyWeakText;
+        private TextMeshProUGUI _enemyShieldText;
+        private Image _enemyShieldFill;
         private TextMeshProUGUI _logText;
         private TextMeshProUGUI _turnCountText;
         private Button _confirmButton;
@@ -50,6 +56,7 @@ namespace AshenPath.Battle
         private readonly List<Button> _cardButtons = new();
         private readonly List<RectTransform> _cardRects = new();
         private readonly List<Vector2> _cardAnchoredPositions = new();
+        private readonly List<TextMeshProUGUI> _cardElementTexts = new();
         private readonly List<TextMeshProUGUI> _cardTitleTexts = new();
         private readonly List<TextMeshProUGUI> _cardDescriptionTexts = new();
         private readonly List<TextMeshProUGUI> _cardCostTexts = new();
@@ -57,6 +64,9 @@ namespace AshenPath.Battle
         private readonly StringBuilder _logBuilder = new();
         private Sprite _roundedPanelSprite;
         private Sprite _solidFillSprite;
+        private RectTransform _enemyActorRect;
+        private Vector2 _enemyActorBasePosition;
+        private Coroutine _enemyShakeCoroutine;
 
         public void Build()
         {
@@ -85,7 +95,11 @@ namespace AshenPath.Battle
             CreateArena(canvasObject.transform);
 
             var enemyPanel = CreateStatusPanel("EnemyPanel", canvasObject.transform, new Vector2(TopPanelMargin, -TopPanelMargin), EnemyPanelSize, new Vector2(0f, 1f), "EnemyName", out _enemyNameText);
+            _enemyWeakText = CreateText("EnemyWeakText", enemyPanel.transform, 20, TextAnchor.MiddleRight, new Color(0.98f, 0.88f, 0.62f, 1f));
+            _enemyWeakText.fontStyle = FontStyles.Bold;
+            ConfigureRect(_enemyWeakText.rectTransform, new Vector2(-PanelPadding, -PanelPadding - 2f), new Vector2(180f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
             _enemyHpFill = CreateStatusBarSection(enemyPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + 48f)), StatusBarSize, EnemyAccent, "HP", out _enemyHpText);
+            _enemyShieldFill = CreateStatusBarSection(enemyPanel.transform, "ShieldSection", new Vector2(PanelPadding, -(PanelPadding + 100f)), StatusBarSize, ShieldAccent, "SHIELD", out _enemyShieldText);
 
             var playerPanel = CreateStatusPanel("PlayerPanel", canvasObject.transform, new Vector2(-TopPanelMargin, -TopPanelMargin), PlayerPanelSize, new Vector2(1f, 1f), "PlayerName", out _playerNameText);
             _playerHpFill = CreateStatusBarSection(playerPanel.transform, "HpSection", new Vector2(PanelPadding, -(PanelPadding + 48f)), StatusBarSize, PlayerAccent, "HP", out _playerHpText);
@@ -120,6 +134,20 @@ namespace AshenPath.Battle
         {
             UpdateUnitDisplay(player, _playerNameText, _playerHpText, _playerHpFill);
             UpdateUnitDisplay(enemy, _enemyNameText, _enemyHpText, _enemyHpFill);
+            if (_enemyWeakText != null)
+            {
+                _enemyWeakText.text = $"Weak: {GetElementLabel(enemy.WeakElement)}";
+            }
+
+            if (_enemyShieldText != null)
+            {
+                _enemyShieldText.text = enemy.IsBroken ? "BREAK" : $"{enemy.ShieldCount} / {enemy.MaxShieldCount}";
+            }
+
+            if (_enemyShieldFill != null)
+            {
+                _enemyShieldFill.fillAmount = enemy.MaxShieldCount > 0 ? enemy.ShieldCount / (float)enemy.MaxShieldCount : 0f;
+            }
         }
 
         public void RefreshPlayerSp(int currentSp, int maxSp)
@@ -208,6 +236,7 @@ namespace AshenPath.Battle
                 _cardTitleTexts[i].text = hand[i].cardName;
                 _cardDescriptionTexts[i].text = hand[i].description;
                 _cardCostTexts[i].text = $"{hand[i].spCost} SP";
+                _cardElementTexts[i].text = GetElementLabel(hand[i].elementType);
             }
         }
 
@@ -218,10 +247,11 @@ namespace AshenPath.Battle
                 var isSelected = IsCardSelected(selectedIndices, i);
                 var canAfford = hand != null && i < hand.Count && currentSp >= hand[i].spCost;
                 _cardButtons[i].interactable = interactable && _cardButtons[i].gameObject.activeSelf && (canAfford || isSelected);
-                _cardBackgrounds[i].color = _cardButtons[i].interactable ? CardColor : CardDisabledColor;
+                _cardBackgrounds[i].color = _cardButtons[i].interactable ? GetCardBaseColor(hand, i) : CardDisabledColor;
                 _cardTitleTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.78f, 0.78f, 0.78f, 1f);
                 _cardDescriptionTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.72f, 0.72f, 0.72f, 1f);
                 _cardCostTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.82f, 0.82f, 0.82f, 1f);
+                _cardElementTexts[i].color = _cardButtons[i].interactable ? DarkTextColor : new Color(0.82f, 0.82f, 0.82f, 1f);
             }
         }
 
@@ -234,15 +264,17 @@ namespace AshenPath.Battle
                 var canAfford = hand != null && i < hand.Count && currentSp >= hand[i].spCost;
 
                 _cardRects[i].anchoredPosition = _cardAnchoredPositions[i] + new Vector2(0f, isSelected ? SelectedCardHop : 0f);
-                _cardBackgrounds[i].color = isSelected ? CardSelectedColor : (_cardButtons[i].interactable ? CardColor : CardDisabledColor);
+                _cardBackgrounds[i].color = isSelected ? GetSelectedCardColor(hand, i) : (_cardButtons[i].interactable ? GetCardBaseColor(hand, i) : CardDisabledColor);
 
                 var titleColor = isSelected || _cardButtons[i].interactable ? DarkTextColor : new Color(0.78f, 0.78f, 0.78f, 1f);
                 var bodyColor = isSelected || _cardButtons[i].interactable ? DarkTextColor : new Color(0.72f, 0.72f, 0.72f, 1f);
                 var costColor = isSelected || _cardButtons[i].interactable || (isActive && canAfford) ? DarkTextColor : new Color(0.82f, 0.82f, 0.82f, 1f);
+                var elementColor = isSelected || _cardButtons[i].interactable ? DarkTextColor : new Color(0.82f, 0.82f, 0.82f, 1f);
 
                 _cardTitleTexts[i].color = titleColor;
                 _cardDescriptionTexts[i].color = bodyColor;
                 _cardCostTexts[i].color = costColor;
+                _cardElementTexts[i].color = elementColor;
             }
         }
 
@@ -256,6 +288,23 @@ namespace AshenPath.Battle
             _confirmButton.interactable = enabled;
             _confirmButton.gameObject.SetActive(true);
             _confirmButtonText.text = enabled ? $"確定 ({selectedSpCost} SP)" : "確定";
+        }
+
+        public void PlayEnemyDamageEffect(int damage)
+        {
+            if (_enemyActorRect == null || damage <= 0)
+            {
+                return;
+            }
+
+            if (_enemyShakeCoroutine != null)
+            {
+                StopCoroutine(_enemyShakeCoroutine);
+                _enemyActorRect.anchoredPosition = _enemyActorBasePosition;
+            }
+
+            _enemyShakeCoroutine = StartCoroutine(ShakeRect(_enemyActorRect, _enemyActorBasePosition, 0.24f, 20f));
+            StartCoroutine(AnimateDamagePopup(_enemyActorRect, damage));
         }
 
         private static bool IsCardSelected(IReadOnlyCollection<int> selectedIndices, int index)
@@ -274,6 +323,59 @@ namespace AshenPath.Battle
             }
 
             return false;
+        }
+
+        private static string GetElementLabel(ElementType elementType)
+        {
+            return elementType switch
+            {
+                ElementType.Fire => "[火]",
+                ElementType.Water => "[水]",
+                ElementType.Wind => "[風]",
+                _ => "[無]"
+            };
+        }
+
+        private static Color GetElementColor(ElementType elementType)
+        {
+            return elementType switch
+            {
+                ElementType.Fire => new Color(0.95f, 0.74f, 0.7f, 1f),
+                ElementType.Water => new Color(0.72f, 0.83f, 0.96f, 1f),
+                ElementType.Wind => new Color(0.74f, 0.92f, 0.76f, 1f),
+                _ => CardColor
+            };
+        }
+
+        private static Color GetSelectedElementColor(ElementType elementType)
+        {
+            return elementType switch
+            {
+                ElementType.Fire => new Color(0.99f, 0.64f, 0.56f, 1f),
+                ElementType.Water => new Color(0.56f, 0.77f, 0.98f, 1f),
+                ElementType.Wind => new Color(0.62f, 0.88f, 0.66f, 1f),
+                _ => CardSelectedColor
+            };
+        }
+
+        private static Color GetCardBaseColor(IReadOnlyList<BattleCardData> hand, int index)
+        {
+            if (hand == null || index < 0 || index >= hand.Count)
+            {
+                return CardColor;
+            }
+
+            return GetElementColor(hand[index].elementType);
+        }
+
+        private static Color GetSelectedCardColor(IReadOnlyList<BattleCardData> hand, int index)
+        {
+            if (hand == null || index < 0 || index >= hand.Count)
+            {
+                return CardSelectedColor;
+            }
+
+            return GetSelectedElementColor(hand[index].elementType);
         }
 
         private void UpdateUnitDisplay(BattleUnit unit, TextMeshProUGUI nameText, TextMeshProUGUI hpText, Image hpFill)
@@ -317,7 +419,8 @@ namespace AshenPath.Battle
             var arena = CreatePanel("Arena", parent, new Vector2(0f, 44f), ArenaSize, new Vector2(0.5f, 0.5f));
             arena.GetComponent<Image>().color = ArenaColor;
 
-            CreateActor(arena.transform, "EnemyActor", new Vector2(-420f, 30f), EnemyAccent, "ENEMY");
+            _enemyActorRect = CreateActor(arena.transform, "EnemyActor", new Vector2(-420f, 30f), EnemyAccent, "ENEMY").GetComponent<RectTransform>();
+            _enemyActorBasePosition = _enemyActorRect.anchoredPosition;
             CreateActor(arena.transform, "PlayerActor", new Vector2(420f, 30f), PlayerAccent, "PLAYER");
 
         }
@@ -357,7 +460,7 @@ namespace AshenPath.Battle
             for (var i = 0; i < 5; i++)
             {
                 var x = startX + i * (cardWidth + spacing);
-                var button = CreateCardButton(handRoot.transform, new Vector2(x, 0f), new Vector2(cardWidth, cardHeight));
+                var button = CreateCardButton(handRoot.transform, new Vector2(x, 0f), new Vector2(cardWidth, cardHeight), true);
                 _cardButtons.Add(button);
                 _cardRects.Add(button.GetComponent<RectTransform>());
                 _cardAnchoredPositions.Add(new Vector2(x, 0f));
@@ -370,13 +473,18 @@ namespace AshenPath.Battle
                 title.overflowMode = TextOverflowModes.Truncate;
                 _cardTitleTexts.Add(title);
 
+                var elementText = CreateText("Element", button.transform, 18, TextAnchor.MiddleLeft, DarkTextColor);
+                elementText.fontStyle = FontStyles.Bold;
+                ConfigureRect(elementText.rectTransform, new Vector2(18f, -52f), new Vector2(72f, 24f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                _cardElementTexts.Add(elementText);
+
                 var cost = CreateText("Cost", button.transform, 20, TextAnchor.UpperRight, DarkTextColor);
                 ConfigureRect(cost.rectTransform, new Vector2(-18f, -18f), new Vector2(96f, 28f), new Vector2(1f, 1f), new Vector2(1f, 1f));
                 cost.fontStyle = FontStyles.Bold;
                 _cardCostTexts.Add(cost);
 
                 var description = CreateText("Description", button.transform, 22, TextAnchor.UpperLeft, DarkTextColor);
-                ConfigureRect(description.rectTransform, new Vector2(18f, -62f), new Vector2(cardWidth - 36f, 86f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+                ConfigureRect(description.rectTransform, new Vector2(18f, -86f), new Vector2(cardWidth - 36f, 108f), new Vector2(0f, 1f), new Vector2(0f, 1f));
                 description.textWrappingMode = TextWrappingModes.Normal;
                 description.overflowMode = TextOverflowModes.Truncate;
                 _cardDescriptionTexts.Add(description);
@@ -433,7 +541,7 @@ namespace AshenPath.Battle
             ConfigureRect(_confirmButtonText.rectTransform, Vector2.zero, ConfirmButtonSize, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
         }
 
-        private Button CreateCardButton(Transform parent, Vector2 anchoredPosition, Vector2 size)
+        private Button CreateCardButton(Transform parent, Vector2 anchoredPosition, Vector2 size, bool enableParallax = false)
         {
             var buttonObject = new GameObject("CardButton", typeof(Image), typeof(Button), typeof(Outline));
             buttonObject.transform.SetParent(parent, false);
@@ -456,6 +564,11 @@ namespace AshenPath.Battle
             colors.disabledColor = CardDisabledColor;
             colors.selectedColor = colors.highlightedColor;
             button.colors = colors;
+
+            if (enableParallax)
+            {
+                buttonObject.AddComponent<CardParallaxEffect>();
+            }
 
             ConfigureRect(image.rectTransform, anchoredPosition, size, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
@@ -519,6 +632,59 @@ namespace AshenPath.Battle
             image.sprite = GetSolidFillSprite();
             image.type = Image.Type.Simple;
             return image;
+        }
+
+        private IEnumerator ShakeRect(RectTransform rectTransform, Vector2 basePosition, float duration, float magnitude)
+        {
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var strength = 1f - Mathf.Clamp01(elapsed / duration);
+                var offset = Random.insideUnitCircle * magnitude * strength;
+                rectTransform.anchoredPosition = basePosition + offset;
+                yield return null;
+            }
+
+            rectTransform.anchoredPosition = basePosition;
+            _enemyShakeCoroutine = null;
+        }
+
+        private IEnumerator AnimateDamagePopup(RectTransform targetRect, int damage)
+        {
+            var popup = CreateText("DamagePopup", targetRect, 42, TextAnchor.MiddleCenter, DamagePopupColor);
+            popup.text = damage.ToString();
+            popup.fontStyle = FontStyles.Bold;
+            popup.outlineWidth = 0.18f;
+            popup.outlineColor = new Color(0.25f, 0.08f, 0.02f, 1f);
+
+            var popupRect = popup.rectTransform;
+            ConfigureRect(popupRect, new Vector2(0f, 88f), new Vector2(180f, 56f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+            var startPosition = popupRect.anchoredPosition;
+            var endPosition = startPosition + new Vector2(0f, 84f);
+            var startScale = new Vector3(0.72f, 0.72f, 1f);
+            var peakScale = new Vector3(1.18f, 1.18f, 1f);
+            const float duration = 0.6f;
+            var elapsed = 0f;
+            var color = DamagePopupColor;
+            var outlineColor = popup.outlineColor;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / duration);
+                popupRect.anchoredPosition = Vector2.Lerp(startPosition, endPosition, t);
+                popupRect.localScale = Vector3.Lerp(t < 0.2f ? startScale : peakScale, Vector3.one, Mathf.InverseLerp(0.2f, 1f, t));
+
+                color.a = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1f, t));
+                outlineColor.a = (byte)Mathf.RoundToInt(color.a * byte.MaxValue);
+                popup.color = color;
+                popup.outlineColor = outlineColor;
+                yield return null;
+            }
+
+            Destroy(popup.gameObject);
         }
 
         private Sprite GetRoundedPanelSprite()
