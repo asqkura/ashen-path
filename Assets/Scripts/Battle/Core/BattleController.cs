@@ -198,6 +198,7 @@ namespace AshenPath.Battle
             _turnEffectState = new BattleCardResolver.TurnEffectState();
 
             ResetBattleRuntime();
+            _cardResolver = new BattleCardResolver(_battleUI, _deckRuntime, _playerUnit, _enemyUnit, PerformAttack, RefreshUi);
             _deckRuntime.BeginBattle();
             _cardResolver.ResetBattleState();
             _deckRuntime.DrawCardsIntoHand(OpeningHandSize, MaxHandSize);
